@@ -4,7 +4,7 @@ import type { Payment } from "../lib/types";
 import { allocTouches, allocValid, fmtDate, round2, shareOf, single, uid } from "../lib/util";
 import { useApp } from "../store";
 import { AllocTags, Empty, Field, Modal, Plus, Tile, saveTextFile } from "../components/bits";
-import { Header, MoneyTabs } from "../components/Shell";
+import { Header } from "../components/Shell";
 import { SplitEditor } from "./Bookkeeping";
 
 const GROUPS: PaymentGroup[] = ["Overdue", "Next 30 days", "Later", "Paid"];
@@ -38,7 +38,6 @@ export function Payments() {
         }
       />
       <div className="content">
-        <MoneyTabs />
         <div className="tiles">
           <Tile label="Overdue" value={overdue.length} sub={money(overdue.reduce((s, p) => s + share(p), 0))} alert={overdue.length > 0} />
           <Tile label="Due in the next 30 days" value={money(next30.reduce((s, p) => s + share(p), 0))} sub={`${next30.length} payments`} />

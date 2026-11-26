@@ -1,5 +1,5 @@
 import type { Screen } from "../store";
-import { Header, NAV } from "../components/Shell";
+import { Header, sectionOf } from "../components/Shell";
 
 const PLANS: Partial<Record<Screen, string[]>> = {
 
@@ -7,7 +7,7 @@ const PLANS: Partial<Record<Screen, string[]>> = {
 };
 
 export function Placeholder({ screen }: { screen: Screen }) {
-  const nav = NAV.find((n) => n.id === screen)!;
+  const nav = sectionOf(screen)!;
   return (
     <>
       <Header title={nav.label} />

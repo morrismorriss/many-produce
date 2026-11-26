@@ -8,36 +8,41 @@ import { gearWarnings } from "../lib/inventory";
 import { useApp, type Screen } from "../store";
 import { Field, Modal, Plus } from "./bits";
 
-export const NAV: { id: Screen; label: string; phase?: number }[] = [
+export interface Section {
+  id: Screen; // the screen the sidebar item opens
+  label: string;
+  phase?: number; // planned build phase, for screens not built yet
+  tabs?: { id: Screen; label: string }[];
+}
+
+/** The sidebar. Related screens live as tabs under one item to keep it short. */
+export const NAV: Section[] = [
   { id: "dashboard", label: "Dashboard" },
-  { id: "collaborators", label: "Collaborators" },
-  { id: "venues", label: "Venues" },
-  { id: "bookkeeping", label: "Bookkeeping" },
-  { id: "shopping", label: "Shopping list" },
+  { id: "collaborators", label: "Contacts", tabs: [{ id: "collaborators", label: "Collaborators" }, { id: "venues", label: "Venues" }] },
+  { id: "bookkeeping", label: "Bookkeeping", tabs: [{ id: "bookkeeping", label: "Ledger" }, { id: "budget", label: "Budget" }, { id: "payments", label: "Payments" }] },
   { id: "paperwork", label: "Paperwork" },
   { id: "schedule", label: "Schedule" }, // calendar, availability, scenes and the timeline
-  { id: "inventory", label: "Equipment log" },
-  { id: "campaigns", label: "Campaigns" },
-  { id: "templates", label: "Templates" },
+  { id: "shopping", label: "Supplies", tabs: [{ id: "shopping", label: "Shopping list" }, { id: "inventory", label: "Equipment log" }] },
+  { id: "campaigns", label: "Outreach", tabs: [{ id: "campaigns", label: "Campaigns" }, { id: "templates", label: "Templates" }] },
   { id: "reports", label: "Reports", phase: 8 },
   { id: "settings", label: "Settings" },
 ];
 
-/** Screens that live as tabs under another sidebar item. */
-export const SCREEN_GROUP: Partial<Record<Screen, Screen>> = { budget: "bookkeeping", payments: "bookkeeping" };
+/** The sidebar item a screen belongs to. */
+export function sectionOf(screen: Screen): Section | undefined {
+  return NAV.find((n) => n.id === screen || n.tabs?.some((t) => t.id === screen));
+}
 
-export const MONEY_TABS: { id: Screen; label: string }[] = [
-  { id: "bookkeeping", label: "Ledger" },
-  { id: "budget", label: "Budget" },
-  { id: "payments", label: "Payments" },
-];
+/** Every screen with a readable name (for the command palette). */
+export const ALL_SCREENS: { id: Screen; label: string; section: string }[] = NAV.flatMap((n) =>
+  n.tabs ? n.tabs.map((t) => ({ id: t.id, label: t.label, section: n.label })) : [{ id: n.id, label: n.label, section: "" }],
+);
 
-/** Ledger · Budget · Payments, shown at the top of each money screen. */
-export function MoneyTabs() {
+function SectionTabs({ section }: { section: Section }) {
   const { screen, setScreen } = useApp();
   return (
-    <div className="chips tabs" role="tablist" aria-label="Bookkeeping" style={{ marginBottom: 16 }}>
-      {MONEY_TABS.map((t) => (
+    <div className="chips tabs" role="tablist" aria-label={section.label}>
+      {section.tabs!.map((t) => (
         <button key={t.id} role="tab" className="chip" aria-selected={screen === t.id} aria-pressed={screen === t.id} onClick={() => setScreen(t.id)}>
           {t.label}
         </button>
@@ -57,11 +62,15 @@ export function Sidebar() {
     const ledger = data.ledger.filter((e) => !project || (e.project_alloc[project] ?? 0) > 0).length;
     return {
       bookkeeping: overdue ? { text: `${overdue} overdue`, alert: true } : ledger ? { text: String(ledger) } : undefined,
-      collaborators: people ? { text: String(people) } : undefined,
+      collaborators: people ? { text: String(people) } : undefined, // Contacts
       paperwork: (() => { const n = missingPaperwork(data, project, today).length; return n ? { text: `${n} missing`, alert: true } : undefined; })(),
-      shopping: (() => { const n = Object.values(data.shopping).flat().filter((i) => (!project || i.project === project) && i.status === "Needed").length; return n ? { text: `${n} to get` } : undefined; })(),
-      inventory: (() => { const n = gearWarnings(data.inventory, data.checkouts, data.people, data.projects, (p) => anchorsFor(p, data.events).closing, today, project).length; return n ? { text: `${n} overdue`, alert: true } : undefined; })(),
-      venues: data.venues.length ? { text: String(data.venues.filter((v) => !project || v.projects.includes(project)).length) } : undefined,
+      // Supplies: overdue gear first, else what's still to buy.
+      shopping: (() => {
+        const late = gearWarnings(data.inventory, data.checkouts, data.people, data.projects, (p) => anchorsFor(p, data.events).closing, today, project).length;
+        if (late) return { text: `${late} overdue`, alert: true };
+        const n = Object.values(data.shopping).flat().filter((i) => (!project || i.project === project) && i.status === "Needed").length;
+        return n ? { text: `${n} to get` } : undefined;
+      })(),
     };
   }, [allPayments, data, project, today, people]);
 
@@ -98,8 +107,8 @@ export function Sidebar() {
       <div className="nav">
         {NAV.map((n, i) => (
           <div key={n.id}>
-            {(i === 6 || i === NAV.length - 1) && <div className="nav-sep" />}
-            <button aria-current={screen === n.id || SCREEN_GROUP[screen] === n.id ? "page" : undefined} onClick={() => setScreen(n.id)}>
+            {(i === 4 || i === NAV.length - 1) && <div className="nav-sep" />}
+            <button aria-current={sectionOf(screen)?.id === n.id ? "page" : undefined} onClick={() => setScreen(n.id)}>
               <span>{n.label}</span>
               {n.phase ? (
                 <span className="later" title={`Planned for build phase ${n.phase}`}>soon</span>
@@ -244,12 +253,15 @@ export function ProjectModal({ onClose, existing }: { onClose: () => void; exist
 }
 
 export function Header({ title, actions }: { title: string; actions?: React.ReactNode }) {
-  const { project, projectBySlug } = useApp();
+  const { project, projectBySlug, screen } = useApp();
   const p = projectBySlug(project);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const section = sectionOf(screen);
+  const tabbed = section?.tabs ? section : undefined;
   return (
     <header className="header">
-      <h1>{title}</h1>
+      <h1>{tabbed ? tabbed.label : title}</h1>
+      {tabbed && <SectionTabs section={tabbed} />}
       <span className="pill" style={p ? { background: p.color + "33" } : undefined}>
         <span className="dot" style={{ background: p?.color ?? "var(--muted)" }} aria-hidden />
         {p?.name ?? "All projects"}
@@ -284,9 +296,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const all: Cmd[] = useMemo(() => {
     const go = (s: Screen) => () => setScreen(s);
     return [
-      ...NAV.map((n) => ({ label: n.label, hint: "Screen", run: go(n.id) })),
-      { label: "Budget", hint: "Bookkeeping", run: go("budget") },
-      { label: "Payments", hint: "Bookkeeping", run: go("payments") },
+      ...ALL_SCREENS.map((n) => ({ label: n.label, hint: n.section || "Screen", run: go(n.id) })),
       ...data.projects.map((p) => ({ label: p.name, hint: "Project", run: () => setProject(p.slug) })),
       ...data.people.map((p) => ({ label: p.name, hint: p.roles.join(", ") || "Person", run: () => { setScreen("collaborators"); openDrawer({ kind: "person", slug: p.slug }); } })),
       ...data.venues.map((v) => ({ label: v.name, hint: "Venue", run: () => { setScreen("venues"); openDrawer({ kind: "venue", slug: v.slug }); } })),

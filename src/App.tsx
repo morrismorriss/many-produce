@@ -15,7 +15,7 @@ import { Placeholder } from "./screens/Placeholder";
 import { Settings } from "./screens/Settings";
 import { useApp, useStore } from "./store";
 import { Drawer } from "./components/Drawer";
-import { CommandPalette, NAV, Sidebar, Toasts } from "./components/Shell";
+import { CommandPalette, Sidebar, Toasts, sectionOf } from "./components/Shell";
 import { isTauri, MemoryFS, openDesktopVault, type VaultFS } from "./lib/fs";
 import { sampleVault } from "./lib/seed";
 import { loadVault } from "./lib/vault";
@@ -152,7 +152,7 @@ function Frame({ onSwitchVault }: { onSwitchVault: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [drawer, openDrawer, fireNewItem]);
 
-  const phase = NAV.find((n) => n.id === screen)?.phase;
+  const phase = sectionOf(screen)?.phase;
   let body;
   if (phase) body = <Placeholder screen={screen} />;
   else if (screen === "dashboard") body = <Dashboard />;

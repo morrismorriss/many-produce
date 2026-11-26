@@ -4,7 +4,7 @@ import { DIRECT_SOURCE, FISCAL_TAG, type Alloc, type EntryKind, type LedgerEntry
 import { allocTouches, allocValid, fmtDate, round2, single, uid } from "../lib/util";
 import { useApp } from "../store";
 import { AllocTags, Chips, Empty, Field, Plus, Tile, saveTextFile } from "../components/bits";
-import { Header, MoneyTabs } from "../components/Shell";
+import { Header } from "../components/Shell";
 import { ledgerToCSV } from "../lib/ledger";
 
 type Filter = "All entries" | "Income" | "Expenses";
@@ -55,7 +55,6 @@ export function Bookkeeping() {
         }
       />
       <div className="content">
-        <MoneyTabs />
         <div className="tiles">
           <Tile label="Money in" value={<span className="in">{money(t.moneyIn)}</span>} />
           <Tile label="Money out" value={money(t.moneyOut)} />

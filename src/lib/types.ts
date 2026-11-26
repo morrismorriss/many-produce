@@ -22,6 +22,8 @@ export interface Project {
   builtin?: boolean; // Company overhead
   /** Scene breakdown cast list: character name -> person slug. */
   cast?: Record<string, string>;
+  stripboard?: boolean; // show the Stripboard tab (always on for Film)
+  planned_uses?: string[]; // where the work will be shown, for clearance scope checks
   notes: string; // markdown body
 }
 
@@ -514,6 +516,77 @@ export interface DailyReport {
   followups_done: boolean;
 }
 
+// ---- Stripboard ----
+
+export const ELEMENT_KINDS = ["extras", "props", "wardrobe", "set_dressing", "vehicles", "animals", "sfx", "makeup", "sound", "equipment"] as const;
+export type ElementKind = (typeof ELEMENT_KINDS)[number];
+
+export interface StripScene {
+  id: string;
+  number: string;
+  ie: string; // INT, EXT, INT/EXT
+  location: string;
+  venue: string; // venue slug, if it's a known location
+  tod: string; // DAY, NIGHT, DAWN, DUSK…
+  pages: number; // eighths of a page
+  description: string;
+  characters: string[]; // linked to people through the project's cast list
+  elements: Record<ElementKind, string[]>;
+  notes: string;
+}
+
+export interface ShootDay {
+  id: string;
+  date: string;
+  call: string;
+  wrap: string;
+  scenes: string[]; // strip ids, in order
+  notes: string;
+}
+
+export interface Board {
+  days: ShootDay[];
+  unscheduled: string[]; // order of strips not in a day
+  page_limit: number; // warn over this many pages a day (eighths)
+  minutes_per_page: number;
+  event_ids: Record<string, string>; // shoot day id -> Schedule event id
+}
+
+// ---- Clearances ----
+
+export const CLEARANCE_TYPES = [
+  "Music (sync)", "Music (master)", "Script / underlying rights", "Artwork and posters", "Logos and brand names", "Footage and photos",
+  "Location", "Talent / appearance", "Minor (guardian signature)", "Fonts and other materials", "Other",
+];
+export const CLEARANCE_STATUSES = ["Needed", "Requested", "Negotiating", "Cleared", "Denied", "Replaced", "Not needed"] as const;
+export type ClearanceStatus = (typeof CLEARANCE_STATUSES)[number];
+export const USES = ["Festival", "Streaming", "Live performance", "Recorded archive", "Social clips", "Broadcast", "Theatrical"];
+
+export interface Clearance {
+  id: string;
+  project: string;
+  item: string;
+  type: string;
+  scenes: string[]; // scene numbers
+  owner: string; // rights holder
+  contact: string;
+  scope: string[]; // uses it's cleared for
+  territory: string;
+  term: string;
+  fee: number | null;
+  status: ClearanceStatus;
+  requested: string;
+  cleared: string;
+  document: string; // Paperwork folder of the signed release or licence
+  payment_id: string;
+  // music cue sheet
+  composer: string;
+  publisher: string;
+  timing: string; // e.g. 0:45
+  usage: string; // Background vocal, Visual vocal, Background instrumental…
+  notes: string;
+}
+
 export interface VaultData {
   projects: Project[];
   ledger: LedgerEntry[];
@@ -538,4 +611,7 @@ export interface VaultData {
   reports: SavedReport[];
   houseReports: HouseReport[];
   dailyReports: DailyReport[];
+  strips: Record<string, StripScene[]>; // by project
+  boards: Record<string, Board>; // by project
+  clearances: Record<string, Clearance[]>; // by project
 }

@@ -179,6 +179,9 @@ export function ProjectModal({ onClose, existing }: { onClose: () => void; exist
             <option>Other</option>
           </select>
         </Field>
+        {p.type !== "Film" && (
+          <label className="field"><span>Stripboard</span><span className="small" style={{ display: "flex", gap: 6, alignItems: "center", color: "var(--text)" }}><input type="checkbox" checked={!!p.stripboard} onChange={(e) => set("stripboard", e.target.checked || undefined)} /> Use the stripboard for scene work</span></label>
+        )}
         <Field label="Status">
           <select value={p.status} onChange={(e) => set("status", e.target.value as Project["status"])}>
             <option>planning</option>

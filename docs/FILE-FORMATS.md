@@ -29,6 +29,9 @@ Many Produce/
   campaigns/<date>-<slug>.md  # marketing and fundraising campaigns
   reports/<date>-<slug>.md    # saved sponsor/funder reports (settings + snapshot + notes)
   reports/report-templates/<slug>.md
+  stripboard/<project>/scenes.csv   # breakdown sheets
+  stripboard/<project>/board.json   # strip order, shoot days and day breaks
+  clearances/<project>.csv
   house-reports/<project>/<date>.md
   daily-reports/<project>/<date>.md
   inventory/
@@ -309,6 +312,31 @@ A venue can carry `deal: { basis: night | run, flat_rental, door_split (0–1, t
 ## daily-reports/&lt;project&gt;/&lt;date&gt;.md
 
 The frontmatter holds `kind`, `location`, `planned_end`, `first_start`, `meal_start`, `meal_end`, `wrap`, `calls: [{ person, call, in, out, late, absent }]`, `scenes: [{ scene, planned_pages, shot_pages, status }]` (pages in eighths), `setups`, `takes`, `used_items` (Equipment log ids), `injuries`, `damage`, `dept_notes` and `tomorrow`. `followups_done` is set once the follow-ups are made. The body is the plain-text report.
+
+## stripboard/&lt;project&gt;/scenes.csv
+
+```
+id,number,ie,location,venue,tod,pages,description,characters,extras,props,wardrobe,set_dressing,vehicles,animals,sfx,makeup,sound,equipment,notes
+```
+
+`pages` is in eighths (`12` = 1 4/8). `characters` and each element column are semicolon-separated. Characters link to people through the project's `cast` map, the same one Schedule → Scenes uses.
+
+## stripboard/&lt;project&gt;/board.json
+
+```json
+{ "days": [{ "id": "day1", "date": "2027-01-17", "call": "17:00", "wrap": "05:00", "scenes": ["st1", "st5"], "notes": "" }],
+  "unscheduled": ["st2", "st3"], "page_limit": 40, "minutes_per_page": 90, "event_ids": { "day1": "ev-day1" } }
+```
+
+`event_ids` links shoot days to the Schedule events they created.
+
+## clearances/&lt;project&gt;.csv
+
+```
+id,item,type,scenes,owner,contact,scope,territory,term,fee,status,requested,cleared,document,payment_id,composer,publisher,timing,usage,notes
+```
+
+`status` is one of `Needed`, `Requested`, `Negotiating`, `Cleared`, `Denied`, `Replaced` or `Not needed`. `scope` and `scenes` are semicolon-separated. `document` is the Paperwork folder of the signed release. Where a project will be shown is stored in `project.md` as `planned_uses`.
 
 ## .manyproduce/settings.json
 

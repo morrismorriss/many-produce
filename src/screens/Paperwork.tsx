@@ -20,6 +20,7 @@ import {
 import { DOC_STATUSES, DOC_TYPES, type DocStatus, type PaperDoc } from "../lib/types";
 import { fmtDate, todayISO } from "../lib/util";
 import { useApp } from "../store";
+import { ClearancesTab } from "./Clearances";
 
 type Tab = "Documents" | "Missing" | "W-9s" | "1099s" | "My tax documents" | "Clearances";
 
@@ -60,13 +61,7 @@ export function Paperwork() {
         {tab === "Missing" && <MissingTab missing={missing} onAdd={setAdding} />}
         {tab === "W-9s" && <W9Tab />}
         {tab === "1099s" && <Tab1099 />}
-        {tab === "Clearances" && (
-          <div className="placeholder card">
-            <span className="pill amber">Build phase 9</span>
-            <h2 style={{ marginTop: 10 }}>Clearances are coming in a later build</h2>
-            <p className="muted">Every right and permission a project needs before it can be shown, recorded or sold: music (sync and master), footage, artwork and logos, locations, talent and minors, with scope, territory and term. Signed releases will link to documents here, and a per-scene view will show what&apos;s fully cleared.</p>
-          </div>
-        )}
+        {tab === "Clearances" && <ClearancesTab />}
         {tab === "My tax documents" && <TaxDocsTab onAdd={() => setAdding({ type: "Tax document received", project: "overhead" })} />}
       </div>
       {adding && <DocModal preset={adding} onClose={() => setAdding(null)} />}

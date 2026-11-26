@@ -23,6 +23,8 @@ import { allocValid, formatAlloc, parseAlloc, shareOf, slugify, weekStart } from
 import { loadVault, personToMd } from "../src/lib/vault";
 import { activeGoal, campaignFromMd, campaignRaised, campaignStats, campaignToMd, newCampaignPath, resultLine } from "../src/lib/campaigns";
 import { MemoryFS } from "../src/lib/fs";
+import { addDay, boardWarnings, castNumbers, dayOutOfDays, dayPages, moveStrip, parseFdx, parseScreenplayText, shootDayEvents, sortUnscheduled, stripsFromCSV, stripsToCSV } from "../src/lib/stripboard";
+import { clearanceWarnings, clearancesFromCSV, clearancesToCSV, cueSheetCSV, sceneClearance } from "../src/lib/clearances";
 import {
   computeReport, dailyCalc, dailyFromMd, dailyFromSchedule, dailyText, dailyToMd, dealFrom, defaultReportSettings, eighths, houseCalc,
   missingHouseReports, reportCSV, reportHtml, reportMarkdown, runSummary, savedReportFromMd, savedReportToMd, settle, ticketsFromRows,
@@ -185,7 +187,7 @@ describe("sample vault + forecast", () => {
   it("loads the sample vault and warns about the low point", async () => {
     const fs = new MemoryFS(sampleVault(today));
     const v = await loadVault(fs);
-    expect(v.projects.map((p) => p.slug)).toEqual(["made-men-reading", "prodigy", "overhead"]);
+    expect(v.projects.map((p) => p.slug)).toEqual(["made-men-reading", "night-shift", "prodigy", "overhead"]);
     expect(v.ledger.some((e) => e.category === "Sponsor fees")).toBe(true);
     const f = buildForecast({
       today, weeks: 12, scenario: "confirmed", cushion: 0, sources: v.settings.money_sources, ledger: v.ledger,
@@ -564,5 +566,66 @@ describe("reports", () => {
     expect(fresh).toMatchObject({ kind: "Rehearsal", planned_end: "21:00", calls: [{ person: "leo-grant", call: "18:00" }], scenes: [{ scene: "1.1", status: "Planned" }] });
     expect(eighths(11)).toBe("1 3/8");
     expect(dailyFromMd(r.path, dailyToMd(r, v.people))).toEqual(r);
+  });
+});
+
+describe("stripboard", () => {
+  const today = "2026-11-26";
+  it("imports Final Draft and plain screenplay text", () => {
+    const fdx = `<?xml version="1.0"?><FinalDraft><Content>
+      <Paragraph Number="1" Type="Scene Heading"><Text>INT. DINER - NIGHT</Text></Paragraph>
+      <Paragraph Type="Action"><Text>Mara wipes the counter.</Text></Paragraph>
+      <Paragraph Type="Character"><Text>MARA</Text></Paragraph>
+      <Paragraph Type="Dialogue"><Text>We're closed.</Text></Paragraph>
+      <Paragraph Type="Character"><Text>DEV (O.S.)</Text></Paragraph>
+      <Paragraph Number="2" Type="Scene Heading"><Text>EXT. PARKING LOT - DAWN</Text></Paragraph>
+    </Content></FinalDraft>`;
+    const a = parseFdx(fdx);
+    expect(a.map((s) => [s.number, s.ie, s.location, s.tod, s.characters])).toEqual([["1", "INT", "DINER", "NIGHT", ["MARA", "DEV"]], ["2", "EXT", "PARKING LOT", "DAWN", []]]);
+    expect(a[0].description).toBe("Mara wipes the counter.");
+    const b = parseScreenplayText("INT. MARA'S CAR - NIGHT\n\nRain on the glass.\n\nOLD MAN\nNeed a ride?\n\nMARA (V.O.)\nNo.\n\nEXT./INT. BUS STOP - DAY #4A#\n\nMARA\nFinally.");
+    expect(b.map((s) => [s.number, s.ie, s.location, s.tod, s.characters])).toEqual([["1", "INT", "MARA'S CAR", "NIGHT", ["OLD MAN", "MARA"]], ["4A", "INT/EXT", "BUS STOP", "DAY", ["MARA"]]]);
+  });
+  it("moves strips, numbers cast, warns, and builds day out of days", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const strips = v.strips["night-shift"];
+    let b = v.boards["night-shift"];
+    expect(b.unscheduled).toEqual(["st2", "st3", "st4"]);
+    b = addDay(b, "2027-01-20");
+    const day2 = b.days[1].id;
+    b = moveStrip(b, "st3", day2);
+    b = moveStrip(b, "st4", day2, "st3");
+    expect(b.days[1].scenes).toEqual(["st4", "st3"]);
+    expect(b.unscheduled).toEqual(["st2"]);
+    expect(castNumbers(strips)).toEqual({ MARA: 1, DEV: 2, "OLD MAN": 3 });
+    expect(dayPages(b.days[0], strips)).toBe(16);
+    const conflicts = [{ id: "c", person: "rosa-diaz", date: "2027-01-20", start: "", end: "", note: "Other gig" }];
+    const w = boardWarnings({ ...b, page_limit: 15 }, strips, v.projects.find((p) => p.slug === "night-shift")!.cast!, conflicts, (s) => s);
+    expect(w.map((x) => x.message)).toEqual(["Day 1 has 2 pages (limit 1 7/8)", "rosa-diaz (OLD MAN) has a conflict on day 2 (Other gig)"]);
+    const dood = dayOutOfDays(b, strips);
+    expect(dood.find((r) => r.character === "MARA")!.marks).toEqual(["SW", "WF"]);
+    expect(dood.find((r) => r.character === "DEV")!.marks).toEqual(["SWF", ""]);
+    const sorted = sortUnscheduled({ ...b, unscheduled: ["st5", "st2", "st1"] }, strips, "location");
+    expect(sorted.unscheduled).toEqual(["st1", "st5", "st2"]);
+    const { events, eventIds } = shootDayEvents(b, strips, "night-shift", { MARA: "maya-ostrowski", DEV: "leo-grant" });
+    expect(events[0]).toMatchObject({ type: "Photo / video shoot", title: "Shoot day 1", called: ["maya-ostrowski", "leo-grant"] });
+    expect(Object.keys(eventIds)).toHaveLength(2);
+    expect(stripsFromCSV(stripsToCSV(strips))).toEqual(strips);
+  });
+});
+
+describe("clearances", () => {
+  const today = "2026-11-26";
+  it("warns about deadlines, denials and scope, and exports a cue sheet", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const items = v.clearances["night-shift"];
+    expect(clearancesFromCSV("night-shift", clearancesToCSV(items))).toEqual(items);
+    const w = clearanceWarnings(items, "2026-12-10", "opening", 4, ["Festival", "Streaming"], today);
+    expect(w.map((x) => x.kind).sort()).toEqual(["deadline", "deadline", "scope"]);
+    expect(clearanceWarnings(items, "2027-06-01", "opening", 4, [], today)).toEqual([]);
+    expect(sceneClearance(items, ["1", "3", "5"])).toEqual([{ scene: "1", total: 2, open: 1 }, { scene: "3", total: 1, open: 1 }, { scene: "5", total: 1, open: 0 }]);
+    const cue = cueSheetCSV("Night Shift", items).split("\n");
+    expect(cue[0]).toBe("cue,title,composer,publisher,rights_holder,timing,usage,scenes,status");
+    expect(cue[1]).toContain("J. Ortiz");
   });
 });

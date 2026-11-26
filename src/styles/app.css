@@ -366,3 +366,27 @@ table.shopping select[aria-label="Department"] { min-width: 118px; }
 .report-page { background: #fff; color: #111; padding: 32px 36px; max-width: 820px; }
 [data-theme="dark"] .report-page { box-shadow: 0 0 0 1px var(--border); }
 table.daily-calls input[type="time"] { width: 100px; }
+
+/* ---- stripboard ---- */
+.stripboard { display: flex; flex-direction: column; gap: 10px; }
+.shoot-day { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--bg); }
+.shoot-day.unscheduled { border-style: dashed; }
+.stripboard.dragging .shoot-day { outline: 2px dashed var(--border); outline-offset: -3px; }
+.day-break { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--text); color: var(--bg); font-size: 13px; }
+.day-break .cell-edit { color: var(--bg); width: auto; }
+.day-break .cell-edit::-webkit-calendar-picker-indicator { filter: invert(1); }
+.shoot-day.unscheduled .day-break { background: var(--surface-2); color: var(--text); }
+.day-break .icon-btn { color: inherit; }
+.strip { display: grid; grid-template-columns: 52px 64px minmax(160px, 1.2fr) 70px 56px 90px 2fr; gap: 8px; align-items: center; padding: 6px 10px; border-top: 1px solid var(--border); cursor: grab; font-size: 13px; color: #1d1b22; }
+.strip:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.strip.strip-int.strip-day { background: #ffffff; }
+.strip.strip-ext.strip-day { background: #fff3b0; }
+.strip.strip-int.strip-night { background: #e2dbf7; }
+.strip.strip-ext.strip-night { background: #cfe3f5; }
+.strip.strip-other { background: #fde2cf; }
+.strip .sn { font-weight: 700; }
+.strip .tag-ie { font-size: 11px; font-weight: 600; letter-spacing: 0.03em; }
+.strip .loc { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strip .pg, .strip .cast { font-variant-numeric: tabular-nums; }
+.strip .desc { color: #4a4652; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drop-hint { padding: 10px; color: var(--muted); font-size: 12px; text-align: center; }

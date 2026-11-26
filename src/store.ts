@@ -7,7 +7,7 @@ import type { VaultFS } from "./lib/fs";
 import { removeWithFees, upsertWithFees } from "./lib/ledger";
 import { ledgerEntryForPayment } from "./lib/payments";
 import { newDocPath, paymentsForSchedule } from "./lib/paperwork";
-import type { Campaign, DailyReport, HouseReport, SavedReport } from "./lib/types";
+import type { Board, Campaign, Clearance, DailyReport, HouseReport, SavedReport, StripScene } from "./lib/types";
 import { newCampaignPath } from "./lib/campaigns";
 import type { Checkout, Conflict, InventoryItem, Scene, ScheduleEvent, ShoppingItem, TimelineTask, TimelineTemplate } from "./lib/types";
 import { producerPurchaseEntry, reimbursementPayment } from "./lib/shopping";
@@ -101,6 +101,9 @@ interface State {
   saveHouseReport: (h: HouseReport) => Promise<void>;
   saveDailyReport: (r: DailyReport) => Promise<void>;
   deleteReportFile: (path: string) => Promise<void>;
+  saveStrips: (project: string, s: StripScene[]) => Promise<void>;
+  saveBoard: (project: string, b: Board) => Promise<void>;
+  saveClearances: (project: string, c: Clearance[]) => Promise<void>;
   reload: (quiet?: boolean) => Promise<void>;
 }
 
@@ -454,6 +457,19 @@ export const useStore = create<State>()((set, get) => {
       await get().fs.trash(path).catch(fail);
       patch((d) => ({ houseReports: d.houseReports.filter((x) => x.path !== path), dailyReports: d.dailyReports.filter((x) => x.path !== path) }));
       get().toast("Report moved to the trash");
+    },
+
+    saveStrips: async (project, sc) => {
+      patch((d) => ({ strips: { ...d.strips, [project]: sc } }));
+      await vault.saveStrips(get().fs, project, sc).catch(fail);
+    },
+    saveBoard: async (project, b) => {
+      patch((d) => ({ boards: { ...d.boards, [project]: b } }));
+      await vault.saveBoard(get().fs, project, b).catch(fail);
+    },
+    saveClearances: async (project, c) => {
+      patch((d) => ({ clearances: { ...d.clearances, [project]: c } }));
+      await vault.saveClearances(get().fs, project, c).catch(fail);
     },
 
     reload: async (quiet) => {

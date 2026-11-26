@@ -114,6 +114,53 @@ I won't be paid for this use beyond any fee in my other agreements with [Company
 ______________________________ [Name]    Date: __________
 `, { doc_type: "Photo / video release" }),
 
+  t("talent-release", "Talent / appearance release", "Agreements", `
+# Appearance release
+
+I, **[Name]**, agree that **[Company]** may record my appearance, voice and performance in **[Project]**, and use those recordings in the finished work and to promote it, in any media now known or invented later, worldwide and without time limit. I won't be paid for this beyond any fee in my other agreements with [Company].
+
+If I'm under 18, my parent or guardian signs below too.
+
+______________________________ [Name]    Date: __________
+
+______________________________ Parent / guardian (if under 18)    Date: __________
+`, { doc_type: "Photo / video release" }),
+
+  t("location-release", "Location release", "Agreements", `
+# Location release
+
+**[Venue]** ("Owner") lets **[Company]** use the property at [address] to film **[Project]** on [Dates], including set-up and clean-up.
+
+[Company] may show the property in the finished work and its promotion, in any media, worldwide and without time limit. [Company] will leave the property as it was found and is responsible for any damage it causes. Fee: [Fee].
+
+______________________________ For the owner    Date: __________
+
+______________________________ [Company], [Producer]    Date: __________
+`, { doc_type: "Rights / licensing" }),
+
+  t("materials-release", "Materials release", "Agreements", `
+# Materials release
+
+**[Name]** owns [describe the artwork, photo, logo or other material] and gives **[Company]** permission to show it in **[Project]** and in the project's promotion, in [festival / streaming / live performance / all media], [territory], for [term]. Fee: [Fee].
+
+______________________________ [Name]    Date: __________
+
+______________________________ [Company], [Producer]    Date: __________
+`, { doc_type: "Rights / licensing" }),
+
+  t("music-request", "Music request letter", "Thank-yous & requests", `
+Hi [First name],
+
+I'm producing [Project], a [short film / play] by [Company]. We'd love to use [song title] by [artist] in a scene where [describe the scene], for about [timing].
+
+We're looking for [sync and master] rights for [festival / streaming / live performance], [territory], for [term]. Our budget for this song is [Amount].
+
+Could you let me know whether that's possible, and what you'd need from us?
+
+Thank you,
+[Producer]
+`, { subject: "Music licence request: [Project]" }),
+
   t("w9-request", "W-9 request", "Thank-yous & requests", `
 Hi [First name],
 

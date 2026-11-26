@@ -7,6 +7,7 @@ import { addDays, fmtDate, parseISO, uid, weekStart } from "../lib/util";
 import { useApp } from "../store";
 import { AvailabilityTab, ScenesTab } from "./Availability";
 import { TimelineTab } from "./Timeline";
+import { StripboardTab } from "./Stripboard";
 
 type Tab = "Calendar" | "Availability" | "Scenes" | "Timeline" | "Stripboard";
 
@@ -16,7 +17,7 @@ export const printText = (title: string, text: string) => printHtml(title, `<pre
 export function Schedule() {
   const { project, projectBySlug, newItemSignal } = useApp();
   const p = projectBySlug(project);
-  const tabs: Tab[] = ["Calendar", "Availability", "Scenes", "Timeline", ...(p?.type === "Film" ? (["Stripboard"] as Tab[]) : [])];
+  const tabs: Tab[] = ["Calendar", "Availability", "Scenes", "Timeline", ...(p?.type === "Film" || p?.stripboard ? (["Stripboard"] as Tab[]) : [])];
   const [tab, setTab] = useState<Tab>("Calendar");
   const [adding, setAdding] = useState<Partial<ScheduleEvent> | null>(null);
   useEffect(() => { if (newItemSignal && tab === "Calendar") setAdding({}); }, [newItemSignal]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -30,13 +31,7 @@ export function Schedule() {
         {active === "Availability" && <AvailabilityTab onSchedule={(e) => { setTab("Calendar"); setAdding(e); }} />}
         {active === "Scenes" && <ScenesTab />}
         {active === "Timeline" && <TimelineTab />}
-        {active === "Stripboard" && (
-          <div className="placeholder card">
-            <span className="pill amber">Build phase 9</span>
-            <h2 style={{ marginTop: 10 }}>Stripboard is coming in a later build</h2>
-            <p className="muted">Breakdown sheets, a drag-and-drop board, day out of days, and imports from Many Write and Final Draft. Shoot days will land on this Calendar as events.</p>
-          </div>
-        )}
+        {active === "Stripboard" && <StripboardTab />}
       </div>
       {adding && <EventModal preset={adding} onClose={() => setAdding(null)} />}
     </>

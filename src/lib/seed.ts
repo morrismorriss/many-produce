@@ -24,6 +24,9 @@ import { checkoutsToCSV, itemsToCSV } from "./inventory";
 import type { Campaign, InventoryItem, ShoppingItem } from "./types";
 import { campaignToMd } from "./campaigns";
 import { dailyToMd, houseToMd } from "./reports";
+import { emptyElements, stripsToCSV } from "./stripboard";
+import { clearancesToCSV, blankClearance } from "./clearances";
+import type { StripScene } from "./types";
 import type { DailyReport, HouseReport } from "./types";
 import { STARTER_TIMELINE_TEMPLATES, applyTemplate, timelineToMd } from "./timeline";
 import { OVERHEAD_PROJECT, PRESET_SPONSORS, SETTINGS_PATH, personToMd, projectToMd, sponsorToMd, venueToMd } from "./vault";
@@ -66,6 +69,23 @@ export function sampleVault(today = todayISO()): Record<string, string> {
       sponsor_fee_rate: null,
       notes: "One-night staged reading with talkback.",
       cast: { VINNIE: "leo-grant", CARMELA: "maya-ostrowski", ROSE: "rosa-diaz" },
+    },
+    {
+      slug: "night-shift",
+      name: "Night Shift",
+      color: "#9B8AE0",
+      subtitle: "Short film · shoots Jan 2027",
+      status: "planning",
+      type: "Film",
+      start: d(-10),
+      end: d(120),
+      opening: d(110),
+      city: "Chicago",
+      fiscal_sponsor: "",
+      sponsor_fee_rate: null,
+      notes: "Twelve-minute short. Festival run first, then streaming.",
+      cast: { MARA: "maya-ostrowski", DEV: "leo-grant", "OLD MAN": "rosa-diaz" },
+      planned_uses: ["Festival", "Streaming"],
     },
   ];
   for (const p of projects) files[`projects/${p.slug}/project.md`] = projectToMd(p);
@@ -286,6 +306,27 @@ export function sampleVault(today = todayISO()): Record<string, string> {
   camp(`campaigns/${d(12)}-cast-announcement.md`, { title: "Cast announcement", type: "Marketing", status: "Drafting", channel: "Instagram", date: d(12), template: "cta-instagram" });
   camp(`campaigns/${d(60)}-reading-invite.md`, { title: "Reading invite", type: "Marketing", project: "made-men-reading", status: "Ideas", channel: "Email", date: d(60) });
   camp(`campaigns/${d(-12)}-reading-sponsor.md`, { title: "Reading sponsor ask", project: "made-men-reading", status: "Done", channel: "In person", date: d(-14), asks_sent: 3, responses: 1, linked_entries: ["e5"] });
+
+  // Night Shift: stripboard and clearances
+  const st = (id: string, number: string, ie: string, location: string, tod: string, pages: number, characters: string[], description: string, el: Partial<StripScene["elements"]> = {}): StripScene =>
+    ({ id, number, ie, location, venue: "", tod, pages, description, characters, elements: { ...emptyElements(), ...el }, notes: "" });
+  const strips = [
+    st("st1", "1", "INT", "DINER", "NIGHT", 12, ["MARA", "DEV"], "Mara finishes her shift; Dev won't leave.", { props: ["Coffee pot", "Order pad"], wardrobe: ["Waitress uniform"], sound: ["Jukebox song: \"Blue Hour\""] }),
+    st("st2", "2", "EXT", "DINER PARKING LOT", "NIGHT", 6, ["MARA"], "Mara can't start her car.", { vehicles: ["Mara's 1998 sedan"] }),
+    st("st3", "3", "INT", "MARA'S CAR", "NIGHT", 9, ["MARA", "OLD MAN"], "A stranger taps on the window.", { equipment: ["Car mount"], set_dressing: ["Bus ad poster"] }),
+    st("st4", "4", "EXT", "BUS STOP", "DAWN", 5, ["MARA", "OLD MAN"], "They wait for the first bus.", { extras: ["2 commuters"] }),
+    st("st5", "5", "INT", "DINER", "DAY", 4, ["DEV"], "Dev opens up, alone.", { props: ["Coffee pot"] }),
+  ];
+  files["stripboard/night-shift/scenes.csv"] = stripsToCSV(strips);
+  files["stripboard/night-shift/board.json"] = JSON.stringify({
+    days: [{ id: "day1", date: d(52), call: "17:00", wrap: "05:00", scenes: ["st1", "st5"], notes: "Diner is ours 5pm–5am" }],
+    unscheduled: ["st2", "st3", "st4"], page_limit: 40, minutes_per_page: 90, event_ids: {},
+  }, null, 2);
+  files["clearances/night-shift.csv"] = clearancesToCSV([
+    blankClearance("night-shift", { id: "cl1", item: "\"Blue Hour\" (jukebox song)", type: "Music (sync)", scenes: ["1"], owner: "Lantern Music Publishing", status: "Negotiating", requested: d(-5), fee: 250, scope: ["Festival"], composer: "J. Ortiz", publisher: "Lantern Music Publishing", timing: "0:48", usage: "Background vocal" }),
+    blankClearance("night-shift", { id: "cl2", item: "Rosie's Diner (location)", type: "Location", scenes: ["1", "5"], owner: "Rosie's Diner", status: "Cleared", cleared: d(-3), scope: ["Festival"], territory: "Worldwide", term: "Perpetual" }),
+    blankClearance("night-shift", { id: "cl3", item: "Bus ad poster", type: "Artwork and posters", scenes: ["3"], status: "Needed" }),
+  ]);
 
   // House and daily reports
   const hr = (date: string, x: Partial<HouseReport>): HouseReport => ({

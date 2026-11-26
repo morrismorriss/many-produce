@@ -3,6 +3,7 @@ import { Empty, Field, Modal, Plus } from "../components/bits";
 import { Header } from "../components/Shell";
 import { draftValues, fillTemplate, templateFields } from "../lib/paperwork";
 import type { Template } from "../lib/types";
+import { STARTER_TEMPLATES } from "../lib/starterTemplates";
 import { slugify, uniqueSlug } from "../lib/util";
 import { useApp } from "../store";
 import { CampaignModal, blankCampaign } from "./Campaigns";
@@ -11,16 +12,25 @@ import type { Campaign } from "../lib/types";
 const GROUP_ORDER = ["Ask letters", "Donation calls to action", "Thank-yous & requests", "Agreements"];
 
 export function Templates() {
-  const { data, newItemSignal } = useApp();
+  const { data, newItemSignal, saveTemplate } = useApp();
   const [sel, setSel] = useState(data.templates.find((t) => !t.doc_type)?.slug ?? data.templates[0]?.slug ?? "");
   const [editing, setEditing] = useState<Template | null>(null);
   useEffect(() => { if (newItemSignal) setEditing(blank()); }, [newItemSignal]);
   const groups = [...new Set([...GROUP_ORDER, ...data.templates.map((t) => t.group)])].filter((g) => data.templates.some((t) => t.group === g));
   const t = data.templates.find((x) => x.slug === sel);
+  const missingStarters = STARTER_TEMPLATES.filter((x) => !data.templates.some((y) => y.slug === x.slug));
 
   return (
     <>
-      <Header title="Templates" actions={<button className="btn primary" onClick={() => setEditing(blank())}><Plus /> Template</button>} />
+      <Header
+        title="Templates"
+        actions={
+          <>
+            {missingStarters.length > 0 && <button className="btn" title={missingStarters.map((x) => x.title).join(", ")} onClick={() => missingStarters.forEach((x) => void saveTemplate(x))}>Add {missingStarters.length} starter template{missingStarters.length > 1 ? "s" : ""}</button>}
+            <button className="btn primary" onClick={() => setEditing(blank())}><Plus /> Template</button>
+          </>
+        }
+      />
       <div className="content">
         <div className="tpl-layout">
           <nav className="tpl-list" aria-label="Templates">

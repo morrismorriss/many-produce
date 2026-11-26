@@ -15,6 +15,7 @@ import { anchorsFor, resolveDue } from "../lib/timeline";
 import { summarize as shopSummary } from "../lib/shopping";
 import { useGearWarnings } from "./Equipment";
 import { missingDailyReports, missingHouseReports } from "../lib/reports";
+import { clearanceWarnings } from "../lib/clearances";
 
 export function Dashboard() {
   const app = useApp();
@@ -68,6 +69,7 @@ export function Dashboard() {
   const gear = useGearWarnings(project);
   const noHouse = missingHouseReports(data.events, data.houseReports, today, project);
   const noDaily = missingDailyReports(data.events, data.dailyReports, today, project);
+  const clearWarn = data.projects.filter((p) => !project || p.slug === project).flatMap((p) => clearanceWarnings(data.clearances[p.slug] ?? [], anchorsFor(p, data.events).opening, "opening", 4, p.planned_uses ?? [], today).map((w) => ({ ...w, project: p.name })));
   const overdueTasks = timelineRows.filter(({ due }) => due && due < today);
   type WeekItem = { date: string; time: string; kind: string; pill: string; text: string; go: () => void };
   const week: WeekItem[] = [
@@ -216,6 +218,13 @@ export function Dashboard() {
                   <button className="btn small" onClick={() => setScreen("reports")}>Fill in</button>
                 </li>
               ))}
+              {clearWarn.length > 0 && (
+                <li>
+                  <span className="pill red">Clearances</span>
+                  <span>{clearWarn.length} clearance{clearWarn.length > 1 ? "s" : ""} need attention: {clearWarn.slice(0, 2).map((w) => w.message).join("; ")}{clearWarn.length > 2 ? "…" : ""}</span>
+                  <button className="btn small" onClick={() => setScreen("paperwork")}>Open</button>
+                </li>
+              )}
               {noDaily.length > 0 && (
                 <li>
                   <span className="pill amber">Daily report</span>
@@ -237,7 +246,7 @@ export function Dashboard() {
                   <button className="btn small" onClick={() => setLow(l)}>Fix</button>
                 </li>
               ))}
-              {!overdue.length && !missing.length && !firstLowPerSource.length && !overdueTasks.length && !toReimburse && !gear.length && !noHouse.length && !noDaily.length && <li className="muted">Nothing needs attention. Nice.</li>}
+              {!overdue.length && !missing.length && !firstLowPerSource.length && !overdueTasks.length && !toReimburse && !gear.length && !noHouse.length && !noDaily.length && !clearWarn.length && <li className="muted">Nothing needs attention. Nice.</li>}
             </ul>
             {missing.length > 0 && (
               <div style={{ marginTop: 8 }}>

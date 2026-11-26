@@ -26,7 +26,9 @@ import { checkoutsFromCSV, checkoutsToCSV, itemsFromCSV, itemsToCSV } from "./in
 import type { Campaign, Checkout, InventoryItem, ShoppingItem } from "./types";
 import { campaignFromMd, campaignToMd } from "./campaigns";
 import { dailyFromMd, dailyToMd, houseFromMd, houseToMd, savedReportFromMd, savedReportToMd } from "./reports";
-import type { DailyReport, HouseReport, SavedReport, VenueDeal } from "./types";
+import type { Board, Clearance, DailyReport, HouseReport, SavedReport, StripScene, VenueDeal } from "./types";
+import { boardFromJSON, normalizeBoard, stripsFromCSV, stripsToCSV } from "./stripboard";
+import { clearancesFromCSV, clearancesToCSV } from "./clearances";
 import { STARTER_TIMELINE_TEMPLATES, timelineFromMd, timelineTemplateFromMd, timelineTemplateToMd, timelineToMd } from "./timeline";
 
 export const SETTINGS_PATH = ".manyproduce/settings.json";
@@ -80,7 +82,7 @@ function extraKeys(d: Record<string, unknown>, known: string[]): Record<string, 
   return Object.keys(out).length ? out : undefined;
 }
 
-const PROJECT_KEYS = ["cast", "slug", "name", "color", "subtitle", "status", "type", "start", "end", "opening", "city", "fiscal_sponsor", "sponsor_fee_rate"];
+const PROJECT_KEYS = ["cast", "stripboard", "planned_uses", "slug", "name", "color", "subtitle", "status", "type", "start", "end", "opening", "city", "fiscal_sponsor", "sponsor_fee_rate"];
 const PERSON_KEYS = ["name", "roles", "projects", "email", "phone", "city", "rate", "rate_type", "status", "pronouns", "payment_method", "w9_on_file", "w9_date", "notes"];
 const VENUE_KEYS = ["deal", "name", "type", "city", "capacity", "rate", "tech_notes", "status", "projects", "next_step", "contact", "hold_dates", "coi_on_file"];
 const SPONSOR_KEYS = ["name", "fee_rate", "fee_applies_to", "contact", "account_url", "review_required_for", "report_schedule"];
@@ -115,6 +117,8 @@ function projectFromDoc(slug: string, d: Record<string, unknown>, body: string):
     fiscal_sponsor: str(d.fiscal_sponsor),
     sponsor_fee_rate: d.sponsor_fee_rate === undefined || d.sponsor_fee_rate === null || d.sponsor_fee_rate === "" ? null : Number(d.sponsor_fee_rate),
     builtin: slug === OVERHEAD_SLUG,
+    stripboard: d.stripboard === true ? true : undefined,
+    planned_uses: Array.isArray(d.planned_uses) ? d.planned_uses.map(String) : undefined,
     cast: d.cast && typeof d.cast === "object" ? Object.fromEntries(Object.entries(d.cast as Record<string, unknown>).map(([k, v]) => [k, String(v)])) : undefined,
     notes: body.trim(),
     extra: extraKeys(d, PROJECT_KEYS),
@@ -336,7 +340,22 @@ export async function loadVault(fs: VaultFS): Promise<VaultData> {
   const houseReports: HouseReport[] = await readPerProject("house-reports", houseFromMd);
   const dailyReports: DailyReport[] = await readPerProject("daily-reports", dailyFromMd);
 
-  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates, events, conflicts, scenes, timelines, timelineTemplates, shopping, inventory, checkouts, campaigns, reports, houseReports, dailyReports };
+  // Stripboard and clearances, per project
+  const strips: Record<string, StripScene[]> = {};
+  const boards: Record<string, Board> = {};
+  for (const pd of await fs.list("stripboard")) {
+    if (!pd.is_dir) continue;
+    strips[pd.name] = stripsFromCSV((await fs.read(`stripboard/${pd.name}/scenes.csv`)) ?? "");
+    boards[pd.name] = normalizeBoard(boardFromJSON(await fs.read(`stripboard/${pd.name}/board.json`)), strips[pd.name]);
+  }
+  const clearances: Record<string, Clearance[]> = {};
+  for (const e of await fs.list("clearances")) {
+    if (e.is_dir || !e.name.endsWith(".csv")) continue;
+    const slug = e.name.slice(0, -4);
+    clearances[slug] = clearancesFromCSV(slug, (await fs.read(`clearances/${e.name}`)) ?? "");
+  }
+
+  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates, events, conflicts, scenes, timelines, timelineTemplates, shopping, inventory, checkouts, campaigns, reports, houseReports, dailyReports, strips, boards, clearances };
 }
 
 // ---- writers ----
@@ -368,4 +387,7 @@ export const saveCampaign = (fs: VaultFS, c: Campaign) => fs.write(c.path, campa
 export const saveReport = (fs: VaultFS, r: SavedReport) => fs.write(r.path, savedReportToMd(r));
 export const saveHouseReport = (fs: VaultFS, h: HouseReport) => fs.write(h.path, houseToMd(h));
 export const saveDailyReport = (fs: VaultFS, r: DailyReport, people: import("./types").Person[]) => fs.write(r.path, dailyToMd(r, people));
+export const saveStrips = (fs: VaultFS, project: string, s: StripScene[]) => fs.write(`stripboard/${project}/scenes.csv`, stripsToCSV(s));
+export const saveBoard = (fs: VaultFS, project: string, b: Board) => fs.write(`stripboard/${project}/board.json`, JSON.stringify(b, null, 2));
+export const saveClearances = (fs: VaultFS, project: string, c: Clearance[]) => fs.write(`clearances/${project}.csv`, clearancesToCSV(c));
 export const saveSettings = (fs: VaultFS, s: Settings) => fs.write(SETTINGS_PATH, JSON.stringify(s, null, 2));

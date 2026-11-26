@@ -13,9 +13,11 @@ import {
   type Person,
   type Project,
   type Settings,
+  type PaperDoc,
   type Venue,
 } from "./types";
 import { addDays, todayISO } from "./util";
+import { docToMd } from "./paperwork";
 import { OVERHEAD_PROJECT, PRESET_SPONSORS, SETTINGS_PATH, personToMd, projectToMd, sponsorToMd, venueToMd } from "./vault";
 
 export function sampleVault(today = todayISO()): Record<string, string> {
@@ -172,10 +174,10 @@ export function sampleVault(today = todayISO()): Record<string, string> {
   ]);
 
   const people: Person[] = [
-    { slug: "ana-reyes", name: "Ana Reyes", roles: ["Director"], projects: ["prodigy"], email: "ana@example.com", phone: "", city: "Chicago", rate: "1500", rate_type: "flat", status: "Confirmed", pronouns: "she/her", payment_method: "Zelle", w9_on_file: true, notes: "Directed our 2025 reading." },
-    { slug: "jun-park", name: "Jun Park", roles: ["Lighting"], projects: ["prodigy"], email: "jun@example.com", phone: "", city: "Chicago", rate: "600", rate_type: "flat", status: "Offer out", pronouns: "they/them", payment_method: "Venmo", w9_on_file: false, notes: "" },
-    { slug: "maya-ostrowski", name: "Maya Ostrowski", roles: ["Actor"], projects: ["prodigy", "made-men-reading"], email: "maya@example.com", phone: "", city: "Evanston", rate: "400", rate_type: "stipend", status: "Confirmed", pronouns: "", payment_method: "", w9_on_file: false, notes: "" },
-    { slug: "dev-okafor", name: "Dev Okafor", roles: ["Stage manager"], projects: ["made-men-reading"], email: "dev@example.com", phone: "", city: "Chicago", rate: "25", rate_type: "hourly", status: "Reached out", pronouns: "he/him", payment_method: "", w9_on_file: false, notes: "" },
+    { slug: "ana-reyes", name: "Ana Reyes", roles: ["Director"], projects: ["prodigy"], email: "ana@example.com", phone: "", city: "Chicago", rate: "1500", rate_type: "flat", status: "Confirmed", pronouns: "she/her", payment_method: "Zelle", w9_on_file: true, w9_date: d(-25), notes: "Directed our 2025 reading." },
+    { slug: "jun-park", name: "Jun Park", roles: ["Lighting"], projects: ["prodigy"], email: "jun@example.com", phone: "", city: "Chicago", rate: "600", rate_type: "flat", status: "Offer out", pronouns: "they/them", payment_method: "Venmo", w9_on_file: false, w9_date: "", notes: "" },
+    { slug: "maya-ostrowski", name: "Maya Ostrowski", roles: ["Actor"], projects: ["prodigy", "made-men-reading"], email: "maya@example.com", phone: "", city: "Evanston", rate: "400", rate_type: "stipend", status: "Confirmed", pronouns: "", payment_method: "", w9_on_file: false, w9_date: "", notes: "" },
+    { slug: "dev-okafor", name: "Dev Okafor", roles: ["Stage manager"], projects: ["made-men-reading"], email: "dev@example.com", phone: "", city: "Chicago", rate: "25", rate_type: "hourly", status: "Reached out", pronouns: "he/him", payment_method: "", w9_on_file: false, w9_date: "", notes: "" },
   ];
   for (const p of people) files[`people/${p.slug}.md`] = personToMd(p);
 
@@ -185,6 +187,36 @@ export function sampleVault(today = todayISO()): Record<string, string> {
     { slug: "hop-hall", name: "Hop Hall Brewery", type: "brewery", city: "Chicago", capacity: 80, rate: "Bar minimum $800", tech_notes: "", status: "Toured", projects: [], next_step: "Ask about Monday nights", contact: "", hold_dates: "", notes: "" },
   ];
   for (const v of venues) files[`venues/${v.slug}.md`] = venueToMd(v);
+
+  // Paperwork
+  const doc = (path: string, x: Partial<PaperDoc>) => {
+    files[`${path}/paperwork.md`] = docToMd({
+      path, title: "", type: "Other", project: "", people: [], venues: [], status: "Needed", sent: "", signed: "", effective: "",
+      expires: "", amount: null, schedule: [], files: [], template: "", notes: "", ...x,
+    });
+  };
+  doc("paperwork/contracts/prodigy-ana-reyes-director-agreement", {
+    title: "Ana Reyes director agreement", type: "Artist agreement", project: "prodigy", people: ["ana-reyes"], status: "Fully signed",
+    sent: d(-30), signed: d(-26), effective: d(-26), amount: 1500, template: "artist-agreement",
+    schedule: [{ amount: 500, due: d(-21), payment_id: "p1" }, { amount: 500, due: d(-3), payment_id: "p2" }, { amount: 500, due: d(200), payment_id: "" }],
+  });
+  doc("paperwork/contracts/prodigy-maya-ostrowski-actor-agreement", {
+    title: "Maya Ostrowski actor agreement", type: "Artist agreement", project: "prodigy", people: ["maya-ostrowski"], status: "Sent",
+    sent: d(-4), amount: 400, template: "artist-agreement",
+  });
+  doc("paperwork/contracts/prodigy-uptown-studio-theatre-rental", {
+    title: "Uptown Studio Theatre rental", type: "Venue rental agreement", project: "prodigy", venues: ["uptown-studio-theatre"], status: "Fully signed",
+    signed: d(-8), amount: 4800,
+  });
+  doc("paperwork/contracts/prodigy-fractured-atlas-sponsorship", {
+    title: "Fractured Atlas fiscal sponsorship (Prodigy)", type: "Fiscal sponsorship agreement", project: "prodigy", status: "Fully signed",
+    signed: d(-50), effective: d(-50),
+  });
+  doc("paperwork/contracts/overhead-general-liability-coi", {
+    title: "General liability certificate", type: "Certificate of insurance (COI)", project: "overhead", status: "Fully signed",
+    effective: d(-340), expires: d(25),
+  });
+  files["paperwork/tax/" + today.slice(0, 4) + "/1099s.csv"] = "payee,issued_date,notes\n";
 
   return files;
 }

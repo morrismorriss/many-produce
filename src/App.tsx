@@ -3,6 +3,7 @@ import type { VaultData } from "./lib/types";
 import { Bookkeeping } from "./screens/Bookkeeping";
 import { Budget } from "./screens/Budget";
 import { Dashboard } from "./screens/Dashboard";
+import { Paperwork } from "./screens/Paperwork";
 import { Payments } from "./screens/Payments";
 import { Collaborators, Venues } from "./screens/People";
 import { Placeholder } from "./screens/Placeholder";
@@ -155,6 +156,7 @@ function Frame({ onSwitchVault }: { onSwitchVault: () => void }) {
   else if (screen === "payments") body = <Payments />;
   else if (screen === "collaborators") body = <Collaborators />;
   else if (screen === "venues") body = <Venues />;
+  else if (screen === "paperwork") body = <Paperwork />;
   else body = <Settings onSwitchVault={onSwitchVault} />;
 
   return (

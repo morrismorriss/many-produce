@@ -50,7 +50,7 @@ export function Collaborators() {
 export function PersonModal({ onClose, existing }: { onClose: () => void; existing?: Person }) {
   const { data, project, savePerson, openDrawer } = useApp();
   const [p, setP] = useState<Person>(
-    existing ?? { slug: "", name: "", roles: [], projects: project ? [project] : [], email: "", phone: "", city: "", rate: "", rate_type: "", status: "Reached out", pronouns: "", payment_method: "", w9_on_file: false, notes: "" },
+    existing ?? { slug: "", name: "", roles: [], projects: project ? [project] : [], email: "", phone: "", city: "", rate: "", rate_type: "", status: "Reached out", pronouns: "", payment_method: "", w9_on_file: false, w9_date: "", notes: "" },
   );
   const set = <K extends keyof Person>(k: K, v: Person[K]) => setP((x) => ({ ...x, [k]: v }));
   const submit = async () => {
@@ -81,7 +81,8 @@ export function PersonModal({ onClose, existing }: { onClose: () => void; existi
           </select>
         </Field>
         <Field label="Payment method"><input value={p.payment_method} onChange={(e) => set("payment_method", e.target.value)} placeholder="Zelle, Venmo, check…" /></Field>
-        <label className="field"><span>W-9 on file</span><input type="checkbox" checked={p.w9_on_file} onChange={(e) => set("w9_on_file", e.target.checked)} style={{ width: 18 }} /></label>
+        <label className="field"><span>W-9 on file</span><input type="checkbox" checked={p.w9_on_file} onChange={(e) => setP((x) => ({ ...x, w9_on_file: e.target.checked, w9_date: e.target.checked ? x.w9_date || new Date().toISOString().slice(0, 10) : "" }))} style={{ width: 18 }} /></label>
+        {p.w9_on_file && <Field label="W-9 received"><input type="date" value={p.w9_date} onChange={(e) => set("w9_date", e.target.value)} /></Field>}
         <div className="wide">
           <div className="muted small" style={{ marginBottom: 4 }}>Projects</div>
           <div className="chips">

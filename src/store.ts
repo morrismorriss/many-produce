@@ -6,7 +6,8 @@ import { create } from "zustand";
 import type { VaultFS } from "./lib/fs";
 import { removeWithFees, upsertWithFees } from "./lib/ledger";
 import { ledgerEntryForPayment } from "./lib/payments";
-import type { BudgetLine, LedgerEntry, Payment, Person, Project, Settings, Sponsor, Venue, VaultData } from "./lib/types";
+import { newDocPath, paymentsForSchedule } from "./lib/paperwork";
+import type { BudgetLine, Issued1099, LedgerEntry, PaperDoc, Payment, Person, Project, Settings, Sponsor, Template, Venue, VaultData } from "./lib/types";
 import { fmtMoney, primaryProject, todayISO, uid } from "./lib/util";
 import * as vault from "./lib/vault";
 
@@ -60,6 +61,15 @@ interface State {
   deleteVenue: (slug: string) => Promise<void>;
   saveSponsor: (s: Sponsor) => Promise<void>;
   saveSettings: (s: Settings) => Promise<void>;
+  /** Create (when path is "") or update a document. Returns the saved doc. */
+  saveDoc: (d: PaperDoc) => Promise<PaperDoc>;
+  deleteDoc: (path: string) => Promise<void>;
+  /** Desktop: pick a file and add it to the document as a new version. */
+  attachDocFile: (path: string, label: string) => Promise<void>;
+  /** Create scheduled payments for installments that don't have one yet. */
+  createSchedulePayments: (path: string) => Promise<number>;
+  saveIssued1099: (year: string, rows: Issued1099[]) => Promise<void>;
+  saveTemplate: (t: Template) => Promise<void>;
   reload: (quiet?: boolean) => Promise<void>;
 }
 
@@ -214,6 +224,60 @@ export const useStore = create<State>()((set, get) => {
     saveSponsor: async (s) => {
       patch((d) => ({ sponsors: upsert(d.sponsors, s, (x) => x.slug) }));
       await vault.saveSponsor(get().fs, s).catch(fail);
+    },
+
+    saveDoc: async (d) => {
+      let doc = d;
+      if (!doc.path) {
+        const year = (doc.signed || doc.effective || todayISO()).slice(0, 4);
+        doc = { ...doc, path: newDocPath(doc, get().data.docs.map((x) => x.path), year) };
+      }
+      patch((data) => ({ docs: upsert(data.docs, doc, (x) => x.path) }));
+      await vault.saveDoc(get().fs, doc).catch(fail);
+      return doc;
+    },
+    deleteDoc: async (path) => {
+      const d = get().data.docs.find((x) => x.path === path);
+      await get().fs.trash(path).catch(fail);
+      patch((data) => ({ docs: data.docs.filter((x) => x.path !== path) }));
+      set({ drawer: null });
+      if (d) get().toast(`"${d.title}" moved to the trash (.manyproduce/trash)`);
+    },
+    attachDocFile: async (path, label) => {
+      const { fs } = get();
+      const d = get().data.docs.find((x) => x.path === path);
+      if (!d) return;
+      if (fs.kind !== "desktop" || !fs.importFile) {
+        get().toast("Attaching files needs the desktop app.");
+        return;
+      }
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const src = await open({ multiple: false, title: `Choose the file for "${label}"` });
+      if (typeof src !== "string") return;
+      const ext = (src.split(".").pop() ?? "pdf").toLowerCase();
+      const v = d.files.length + 1;
+      const file = `v${v}-${label.toLowerCase().replace(/^v\d+\s*/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "file"}.${ext}`;
+      await fs.importFile(src, `${path}/${file}`).catch(fail);
+      await get().saveDoc({ ...d, files: [...d.files, { label: label.match(/^v\d/) ? label : `v${v} ${label}`, file, added: todayISO() }] });
+    },
+    createSchedulePayments: async (path) => {
+      const d = get().data.docs.find((x) => x.path === path);
+      if (!d) return 0;
+      const data = get().data;
+      const payee = data.people.find((p) => p.slug === d.people[0])?.name ?? data.venues.find((v) => v.slug === d.venues[0])?.name ?? "";
+      const { doc, payments } = paymentsForSchedule(d, payee, data.settings.last_project || "overhead");
+      for (const p of payments) await get().savePayment(p);
+      await get().saveDoc(doc);
+      if (payments.length) get().toast(`${payments.length} scheduled payment${payments.length > 1 ? "s" : ""} added to Payments`);
+      return payments.length;
+    },
+    saveIssued1099: async (year, rows) => {
+      patch((d) => ({ issued1099: { ...d.issued1099, [year]: rows } }));
+      await vault.saveIssued1099(get().fs, year, rows).catch(fail);
+    },
+    saveTemplate: async (t) => {
+      patch((d) => ({ templates: upsert(d.templates, t, (x) => x.slug) }));
+      await vault.saveTemplate(get().fs, t).catch(fail);
     },
 
     reload: async (quiet) => {

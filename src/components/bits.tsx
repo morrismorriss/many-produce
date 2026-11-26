@@ -178,3 +178,48 @@ export async function saveTextFile(name: string, text: string, mime = "text/plai
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** Save binary data (zip, PDF): desktop uses a save dialog; browser downloads. */
+export async function saveBinaryFile(name: string, bytes: Uint8Array) {
+  if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const { invoke } = await import("@tauri-apps/api/core");
+    const path = await save({ defaultPath: name });
+    if (!path) return;
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    await invoke("export_file_base64", { path, data: btoa(bin) });
+    return;
+  }
+  const blob = new Blob([bytes as BlobPart]);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Print an HTML fragment on its own page (the system dialog offers "Save as PDF"). */
+export function printHtml(title: string, html: string) {
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument!;
+  doc.open();
+  doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title.replace(/</g, "&lt;")}</title>
+<style>
+  @page { margin: 22mm 20mm; }
+  body { font: 11.5pt/1.55 Georgia, "Times New Roman", serif; color: #111; }
+  h1 { font: 700 18pt/1.2 "Helvetica Neue", Arial, sans-serif; margin: 0 0 14pt; }
+  h2 { font: 700 12.5pt/1.3 "Helvetica Neue", Arial, sans-serif; margin: 16pt 0 6pt; }
+  p { margin: 0 0 8pt; }
+  .blank { letter-spacing: 0; }
+</style></head><body>${html}</body></html>`);
+  doc.close();
+  setTimeout(() => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    setTimeout(() => iframe.remove(), 1000);
+  }, 200);
+}

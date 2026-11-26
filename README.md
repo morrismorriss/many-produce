@@ -12,7 +12,7 @@ It's the third sibling after Many Write (the writing) and Many Apply (the grants
 
 ## What works in this build
 
-This build covers phases 1 to 3 of the spec, plus the basics of Collaborators and Venues from phase 4.
+This build covers phases 1 to 4 of the spec.
 
 | Screen | What it does |
 | --- | --- |
@@ -23,18 +23,19 @@ This build covers phases 1 to 3 of the spec, plus the basics of Collaborators an
 | **Payments** | Grouped as Overdue · Next 30 days · Later · Paid. **Ticking one paid creates the ledger entry** with project and category filled in; unticking removes it. Supports splits and `.ics` calendar export. |
 | **Collaborators** | Table with role filters. The drawer shows roles, contact details, rate, W-9 status, **paid to date** from the ledger, projects, and a "Schedule payment" button. |
 | **Venues** | Card grid with status counts. The drawer shows the deposit schedule, linked from Payments. |
-| **Settings** | Vault, theme (Light, Dark, Pink or follow system), currency, money sources with opening balances, low-balance cushion, fiscal sponsors and fee rates, categories and tags. |
+| **Paperwork** | Every contract and tax document in one place, each with its type, project, the people and venues it involves, its status (Needed → Drafted → Sent → Signed by them → Fully signed) and dates. Every uploaded file is kept as a version (v1 sent, v2 signed). A **Missing** list flags a confirmed collaborator with no signed agreement, anyone paid with no W-9, a booked venue with no rental agreement or COI, a project with a sponsor but no sponsorship agreement, and anything expiring within 30 days. It also appears on the Dashboard and in each person's and venue's drawer. **Draft from template** fills an agreement from the person, venue and project, saves it as markdown you can edit, and prints or saves it as a PDF; its **fee schedule creates the payments**. A **W-9 tracker** shows on file or not, when it arrived, and a copyable request; it never reads taxpayer ID numbers. The **1099 tracker** totals what you paid each payee per year, with a threshold you set, and has CSV export. A one-click **year-end packet** zips the year's ledger, category totals, 1099 list, receipts and tax documents for your accountant. |
+| **Settings** | Vault, your name and company (used in templates), theme (Light, Dark, Pink or follow system), currency, money sources with opening balances, low-balance cushion, fiscal sponsors and fee rates, categories and tags. |
 
 Also included: the Cmd/Ctrl+K command palette (jumps to any screen, project, person, venue, entry or payment), Cmd/Ctrl+N for a new item, Cmd/Ctrl+\ to toggle the sidebar and Cmd/Ctrl+. to close the drawer. Changes save automatically, deletes can be undone, and nothing is hard-deleted: deleted files go to `.manyproduce/trash/`. The desktop app watches the vault folder, so edits made in other apps show up straight away.
 
-The other screens in the sidebar (Shopping list, Paperwork, Schedule, Timeline, Stripboard, Clearances, Who has what, Campaigns, Templates and Reports) are marked **soon**. Each one shows what it will do.
+The other screens in the sidebar (Shopping list, Schedule, Timeline, Stripboard, Clearances, Who has what, Campaigns, Templates and Reports) are marked **soon**. Each one shows what it will do.
 
 ## Roadmap (build phases from the spec)
 
 1. ✅ Vault and file formats, projects and the project switcher, Bookkeeping ledger with + Income / + Expense and tags
 2. ✅ Budget and Payments (tick paid → ledger), automatic sponsor fees, splits
 3. ✅ Dashboard with the cash flow forecast
-4. ◐ Collaborators and Venues with drawers ✅ · Paperwork and tax documents
+4. ✅ Collaborators and Venues with drawers, Paperwork and tax documents
 5. Schedule builder and Timeline
 6. Shopping list with buyer tags and reimbursements, and Who has what
 7. Campaigns and Templates
@@ -42,7 +43,7 @@ The other screens in the sidebar (Shopping list, Paperwork, Schedule, Timeline, 
 9. Stripboard (breakdown, board, day out of days) and Clearances
 10. Todoist sync, CSV import/export, backup, packaging, GitHub Releases (the release workflow is already in `.github/workflows/release.yml`)
 
-Not built yet: the theme builder and the shared theme folder.
+Not built yet: the theme builder and the shared theme folder, and the option to keep `paperwork/tax/` outside the vault (for example in an encrypted disk image).
 
 ## Running it
 

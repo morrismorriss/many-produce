@@ -263,3 +263,8 @@ table.t tfoot td { font-weight: 600; border-bottom: 0; }
 .budget-layout { display: flex; flex-direction: column; gap: 14px; }
 .budget-layout > .card + .card { margin-top: 0; }
 .income-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px 24px; }
+.draft-preview { white-space: pre-wrap; font: 12px/1.5 ui-monospace, Menlo, monospace; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; max-height: 260px; overflow: auto; margin: 0; }
+.draft-editor { width: 100%; min-height: 320px; font: 13px/1.6 ui-monospace, Menlo, monospace; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); resize: vertical; }
+.section-title { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.section-title h3 { flex: 1; }
+.linklike { border: 0; background: none; padding: 0; color: var(--secondary); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }

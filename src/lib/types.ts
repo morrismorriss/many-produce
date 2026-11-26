@@ -106,6 +106,7 @@ export interface Person {
   pronouns: string;
   payment_method: string;
   w9_on_file: boolean;
+  w9_date: string; // when the W-9 arrived; the form itself is never read
   notes: string;
 }
 
@@ -161,6 +162,10 @@ export interface Settings {
   tags: string[];
   last_project: string; // "" = All projects
   forecast_weeks: 6 | 12 | 26;
+  producer_name: string; // fills [Producer] in templates
+  company_name: string; // fills [Company]
+  threshold_1099: number; // user-set, since IRS rules change
+  doc_types: string[];
 }
 
 export const FISCAL_TAG = "Through fiscal sponsor";
@@ -183,7 +188,72 @@ export const DEFAULT_SETTINGS: Settings = {
   tags: [FISCAL_TAG, "Restricted", "In-kind", "Reimbursable", "Has receipt"],
   last_project: "",
   forecast_weeks: 12,
+  producer_name: "",
+  company_name: "",
+  threshold_1099: 2000,
+  doc_types: [],
 };
+
+// ---- Paperwork ----
+
+export const DOC_TYPES = [
+  "Artist agreement", "Crew agreement", "Venue rental agreement", "Rights / licensing",
+  "Fiscal sponsorship agreement", "Grant agreement", "Certificate of insurance (COI)",
+  "Photo / video release", "Permit", "W-9", "1099 issued", "Tax document received", "Other",
+] as const;
+
+export const DOC_STATUSES = ["Needed", "Drafted", "Sent", "Signed by them", "Fully signed", "Expired", "Void"] as const;
+export type DocStatus = (typeof DOC_STATUSES)[number];
+
+export interface DocFile {
+  label: string; // "v1 sent", "v2 signed"
+  file: string; // file name inside the document's folder
+  added: string;
+}
+
+export interface Installment {
+  amount: number;
+  due: string;
+  payment_id: string; // set once the matching payment is created
+}
+
+export interface PaperDoc {
+  /** Folder relative to the vault, e.g. paperwork/contracts/prodigy-ana-reyes-director-agreement */
+  path: string;
+  title: string;
+  type: string;
+  project: string; // slug or "" (company-wide)
+  people: string[]; // person slugs
+  venues: string[]; // venue slugs
+  status: DocStatus;
+  sent: string;
+  signed: string;
+  effective: string;
+  expires: string;
+  amount: number | null;
+  schedule: Installment[];
+  files: DocFile[];
+  template: string; // template it was drafted from
+  notes: string; // markdown body
+  extra?: Record<string, unknown>;
+}
+
+export interface Issued1099 {
+  payee: string;
+  issued_date: string;
+  notes: string;
+}
+
+export interface Template {
+  slug: string;
+  title: string;
+  group: string; // "Agreements", "Ask letters", ...
+  doc_type: string; // for agreement templates: the Paperwork type it makes
+  subject: string;
+  solicitation: boolean; // "Needs fiscal sponsor review"
+  body: string;
+  extra?: Record<string, unknown>;
+}
 
 export interface VaultData {
   projects: Project[];
@@ -194,4 +264,7 @@ export interface VaultData {
   venues: Venue[];
   sponsors: Sponsor[];
   settings: Settings;
+  docs: PaperDoc[];
+  issued1099: Record<string, Issued1099[]>; // by year
+  templates: Template[];
 }

@@ -9,6 +9,8 @@ import { useApp } from "../store";
 import { Modal, Progress, ProjectTag, Tile, saveTextFile } from "../components/bits";
 import { Header } from "../components/Shell";
 import { PaymentModal } from "./Payments";
+import { MissingList } from "./Paperwork";
+import { missingPaperwork } from "../lib/paperwork";
 
 export function Dashboard() {
   const app = useApp();
@@ -46,10 +48,7 @@ export function Dashboard() {
   const payments = allPayments.filter((p) => allocTouches(p.project_alloc, project));
   const overdue = payments.filter((p) => groupOf(p, today) === "Overdue");
 
-  // People paid (in the ledger) with no W-9 on file.
-  const noW9 = data.people.filter(
-    (person) => !person.w9_on_file && data.ledger.some((e) => e.kind === "expense" && e.counterparty === person.name && allocTouches(e.project_alloc, project)),
-  );
+  const missing = useMemo(() => missingPaperwork(data, project, today), [data, project, today]);
 
   const week = payments
     .filter((p) => p.status === "scheduled" && p.due >= today && p.due <= addDays(today, 7))
@@ -75,7 +74,7 @@ export function Dashboard() {
           <Tile label="Still to pay" value={money(stillToPay)} sub="Budgeted, not yet paid" />
           <Tile label="Income raised" value={<span className="in">{money(raised)}</span>} sub={`of ${money(goal)} goal`} />
           <Tile label="Payments overdue" value={overdue.length} alert={overdue.length > 0} sub={overdue.length ? money(overdue.reduce((s, p) => s + p.amount * shareOf(p.project_alloc, project), 0)) : "All caught up"} />
-          <Tile label="Paperwork missing" value={noW9.length} alert={noW9.length > 0} sub="W-9s for people paid" />
+          <Tile label="Paperwork missing" value={missing.length} alert={missing.length > 0} sub={missing.length ? "Agreements, W-9s, COIs…" : "All on file"} />
         </div>
 
         <section className="card" aria-label="Cash flow forecast">
@@ -172,13 +171,6 @@ export function Dashboard() {
                   <button className="btn small" onClick={() => { setScreen("payments"); openDrawer({ kind: "payment", id: p.id }); }}>Open</button>
                 </li>
               ))}
-              {noW9.map((p) => (
-                <li key={p.slug}>
-                  <span className="pill amber">No W-9</span>
-                  <span>{p.name} has been paid but has no W-9 on file</span>
-                  <button className="btn small" onClick={() => { setScreen("collaborators"); openDrawer({ kind: "person", slug: p.slug }); }}>Open</button>
-                </li>
-              ))}
               {firstLowPerSource.map((l) => (
                 <li key={"l" + l.week + l.source}>
                   <span className="pill red">Low point</span>
@@ -186,9 +178,14 @@ export function Dashboard() {
                   <button className="btn small" onClick={() => setLow(l)}>Fix</button>
                 </li>
               ))}
-              {!overdue.length && !noW9.length && !firstLowPerSource.length && <li className="muted">Nothing needs attention. Nice.</li>}
+              {!overdue.length && !missing.length && !firstLowPerSource.length && <li className="muted">Nothing needs attention. Nice.</li>}
             </ul>
-            <p className="small muted" style={{ marginTop: 10 }}>Contracts, COIs, timeline tasks, reimbursements and reports join this list as those screens are built.</p>
+            {missing.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <MissingList missing={missing} compact={!!project} />
+              </div>
+            )}
+            <p className="small muted" style={{ marginTop: 10 }}>Timeline tasks, reimbursements, house reports and gear returns join this list as those screens are built.</p>
           </section>
 
           <section className="card" aria-label="This week">

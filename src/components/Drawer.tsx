@@ -3,7 +3,11 @@ import { isAutoFee } from "../lib/ledger";
 import { fmtDate } from "../lib/util";
 import { EntryForm } from "../screens/Bookkeeping";
 import { PersonModal, VenueModal } from "../screens/People";
+import { DocModal, DraftModal, STATUS_PILL } from "../screens/Paperwork";
 import { PaymentModal } from "../screens/Payments";
+import { missingPaperwork } from "../lib/paperwork";
+import type { PaperDoc } from "../lib/types";
+import { DocDrawerBody } from "./DocDrawer";
 import { useApp } from "../store";
 import { AllocTags, Initials, ProjectTag, X } from "./bits";
 
@@ -35,6 +39,17 @@ function DrawerContent({ onClose, full, onToggleFull }: { onClose: () => void; f
   const [editing, setEditing] = useState(false);
   const [schedule, setSchedule] = useState(false);
   const h = { onClose, full, onToggleFull };
+
+  if (drawer?.kind === "doc") {
+    const d = data.docs.find((x) => x.path === drawer.path);
+    if (!d) return <Head title="Document not found" {...h} />;
+    return (
+      <>
+        <Head title={d.title} {...h} />
+        <div className="drawer-body"><DocDrawerBody doc={d} /></div>
+      </>
+    );
+  }
 
   if (drawer?.kind === "entry") {
     const e = data.ledger.find((x) => x.id === drawer.id);
@@ -108,6 +123,7 @@ function DrawerContent({ onClose, full, onToggleFull }: { onClose: () => void; f
               <ul className="attn" style={{ marginTop: 6 }}>{upcoming.map((x) => <li key={x.id}>{fmtDate(x.due)} · {x.title} · {money(x.amount)}</li>)}</ul>
             </div>
           )}
+          <PaperworkSection docs={data.docs.filter((d) => d.people.includes(p.slug))} missing={missingPaperwork(data, "", app.today).filter((m) => m.person === p.slug)} preset={{ people: [p.slug], project: p.projects[0] ?? "" }} draft={{ person: p.slug }} />
           {p.notes && <div><h3>Notes</h3><p style={{ whiteSpace: "pre-wrap" }}>{p.notes}</p></div>}
           <div className="toolbar">
             <button className="btn primary" onClick={() => setEditing(true)}>Edit</button>
@@ -149,6 +165,7 @@ function DrawerContent({ onClose, full, onToggleFull }: { onClose: () => void; f
               <ul className="attn" style={{ marginTop: 6 }}>{deposits.map((x) => <li key={x.id}><span className={`pill ${x.status === "paid" ? "green" : ""}`}>{x.status === "paid" ? "Paid" : "Due"}</span>{fmtDate(x.due)} · {x.title} · {money(x.amount)}</li>)}</ul>
             ) : <p className="muted small">No payments to this venue yet.</p>}
           </div>
+          <PaperworkSection docs={data.docs.filter((d) => d.venues.includes(v.slug))} missing={missingPaperwork(data, "", app.today).filter((m) => m.venue === v.slug)} preset={{ venues: [v.slug], project: v.projects[0] ?? "", type: "Venue rental agreement" }} draft={{ venue: v.slug }} />
           {v.notes && <div><h3>Notes</h3><p style={{ whiteSpace: "pre-wrap" }}>{v.notes}</p></div>}
           <div className="toolbar">
             <button className="btn primary" onClick={() => setEditing(true)}>Edit</button>
@@ -171,3 +188,43 @@ function OpenMd({ path, root }: { path: string; root: string }) {
   return <span className="small muted" title={`${root}/${path}`}>{path}</span>;
 }
 
+
+/** The Paperwork section in a collaborator's or venue's drawer. */
+function PaperworkSection({ docs, missing, preset, draft }: { docs: PaperDoc[]; missing: ReturnType<typeof missingPaperwork>; preset: Partial<PaperDoc>; draft: { person?: string; venue?: string } }) {
+  const { openDrawer } = useApp();
+  const [adding, setAdding] = useState<Partial<PaperDoc> | null>(null);
+  const [drafting, setDrafting] = useState(false);
+  return (
+    <div>
+      <div className="section-title">
+        <h3>Paperwork</h3>
+        <button className="btn small" onClick={() => setDrafting(true)}>Draft…</button>
+        <button className="btn small" onClick={() => setAdding(preset)}>+ Document</button>
+      </div>
+      {missing.length > 0 && (
+        <ul className="attn" style={{ marginBottom: 6 }}>
+          {missing.map((m, i) => (
+            <li key={i}>
+              <span className="pill red">Missing</span>
+              <span className="small">{m.message}</span>
+              {m.preset && <button className="btn small" onClick={() => setAdding(m.preset!)}>Add</button>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {docs.length ? (
+        <ul className="attn">
+          {docs.map((d) => (
+            <li key={d.path} style={{ cursor: "pointer" }} onClick={() => openDrawer({ kind: "doc", path: d.path })}>
+              <span className={`pill ${STATUS_PILL[d.status]}`}>{d.status}</span>
+              <span>{d.title}</span>
+              <span className="muted small" style={{ marginLeft: "auto" }}>{d.type}</span>
+            </li>
+          ))}
+        </ul>
+      ) : !missing.length ? <p className="muted small">No documents yet.</p> : null}
+      {adding && <DocModal preset={adding} onClose={() => setAdding(null)} />}
+      {drafting && <DraftModal preset={draft} onClose={() => setDrafting(false)} />}
+    </div>
+  );
+}

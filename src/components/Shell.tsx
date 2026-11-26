@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { groupOf } from "../lib/payments";
+import { missingPaperwork } from "../lib/paperwork";
 import type { Project } from "../lib/types";
 import { uniqueSlug } from "../lib/util";
 import { useApp, type Screen } from "../store";
@@ -13,7 +14,7 @@ export const NAV: { id: Screen; label: string; phase?: number }[] = [
   { id: "budget", label: "Budget" },
   { id: "payments", label: "Payments" },
   { id: "shopping", label: "Shopping list", phase: 6 },
-  { id: "paperwork", label: "Paperwork", phase: 4 },
+  { id: "paperwork", label: "Paperwork" },
   { id: "schedule", label: "Schedule", phase: 5 },
   { id: "timeline", label: "Timeline", phase: 5 },
   { id: "stripboard", label: "Stripboard", phase: 9 },
@@ -38,6 +39,7 @@ export function Sidebar() {
       payments: open.length ? { text: overdue ? `${overdue} overdue` : `${open.length} open`, alert: overdue > 0 } : undefined,
       bookkeeping: ledger ? { text: String(ledger) } : undefined,
       collaborators: people ? { text: String(people) } : undefined,
+      paperwork: (() => { const n = missingPaperwork(data, project, today).length; return n ? { text: `${n} missing`, alert: true } : undefined; })(),
       venues: data.venues.length ? { text: String(data.venues.filter((v) => !project || v.projects.includes(project)).length) } : undefined,
     };
   }, [allPayments, data, project, today, people]);

@@ -16,6 +16,11 @@ Many Produce/
   people/<slug>.md      # collaborators
   venues/<slug>.md
   sponsors/<slug>.md    # fiscal sponsors and fee rates
+  paperwork/
+    contracts/<doc>/      # paperwork.md + file versions (v1-sent.pdf, v2-signed.pdf) + draft.md
+    tax/<year>/<doc>/     # W-9s, 1099s issued, tax documents received
+    tax/<year>/1099s.csv  # which 1099s you issued, and when
+  templates/<slug>.md     # agreement and letter templates with [Field] placeholders
   .manyproduce/
     settings.json
     trash/              # nothing is hard-deleted; it lands here
@@ -105,8 +110,55 @@ Frontmatter: `name, type, city, capacity, rate, tech_notes, status (Contacted | 
 
 Frontmatter: `name, fee_rate (0.08 = 8%), fee_applies_to, contact, account_url, review_required_for, report_schedule`. New vaults start with presets for Fractured Atlas (8%) and Producer Hub (2%).
 
+## paperwork/…/&lt;doc&gt;/paperwork.md
+
+```yaml
+---
+title: Ana Reyes director agreement
+type: Artist agreement        # or Crew agreement, Venue rental agreement, Certificate of insurance (COI), W-9, …
+project: prodigy              # blank = company-wide
+people: [ana-reyes]
+venues: []
+status: Fully signed          # Needed | Drafted | Sent | Signed by them | Fully signed | Expired | Void
+sent: 2026-10-27
+signed: 2026-10-31
+effective: 2026-10-31
+expires: ""
+amount: 1500
+schedule:                     # fee schedule; each installment links to the payment it created
+  - { amount: 500, due: 2026-11-05, payment_id: p1 }
+files:                        # every uploaded version is kept
+  - { label: v1 sent, file: v1-sent.pdf, added: 2026-10-27 }
+  - { label: v2 signed, file: v2-signed.pdf, added: 2026-10-31 }
+template: artist-agreement    # if drafted from a template
+---
+Notes.
+```
+
+A draft made from a template is saved next to it as `draft.md`. Documents of type W-9, 1099 issued and Tax document received are filed under `paperwork/tax/<year>/`.
+
+The app never reads the contents of a W-9. People records only hold `w9_on_file` and `w9_date`.
+
+`paperwork/tax/<year>/1099s.csv` has the columns `payee, issued_date, notes`.
+
+## templates/&lt;slug&gt;.md
+
+```yaml
+---
+title: Artist agreement
+group: Agreements             # Agreements, Ask letters, Donation calls to action, Thank-yous & requests
+doc_type: Artist agreement    # agreement templates: the Paperwork type a draft becomes
+subject: ""                   # letters: subject line, may contain [Fields]
+solicitation: false           # true = "Needs fiscal sponsor review"
+---
+Body with [Producer], [Company], [Name], [First name], [Role], [Project], [Dates], [Opening],
+[City], [Venue], [Fee], [Payment schedule], [Today]…
+```
+
+New vaults start with plain-language agreement templates (artist, crew, venue rental, photo/video release) and the spec's starter letters. Fields with no value are left in brackets for you to fill in.
+
 ## .manyproduce/settings.json
 
-This file holds the currency, theme, low-balance `cushion`, `money_sources` (each with `name`, `opening_balance`, `opening_date`, and an optional `sponsor` slug for sponsor funds), the category and tag lists, the last selected project and the forecast length.
+This file holds the currency, theme, low-balance `cushion`, `money_sources` (each with `name`, `opening_balance`, `opening_date`, and an optional `sponsor` slug for sponsor funds), the category and tag lists, the last selected project, the forecast length, `producer_name` and `company_name` (used in templates), `threshold_1099` (the 1099 reporting threshold, which you can change because IRS rules change) and `doc_types` (your own document types).
 
 A source's current balance is its opening balance plus every ledger entry on that source dated on or after `opening_date`.

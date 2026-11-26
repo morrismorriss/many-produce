@@ -12,7 +12,8 @@ import {
   upsertWithFees,
 } from "../src/lib/ledger";
 import { groupOf, ledgerEntryForPayment, paymentsFromMd, paymentsToICS, paymentsToMd } from "../src/lib/payments";
-import { FISCAL_TAG, type LedgerEntry, type Payment, type Project, type Sponsor } from "../src/lib/types";
+import { FISCAL_TAG, type LedgerEntry, type Payment, type Person, type Project, type Sponsor } from "../src/lib/types";
+import { blankDoc, docFromMd, docToMd, fillTemplate, list1099CSV, markdownToHtml, missingPaperwork, paymentsForSchedule, splitFee, totals1099 } from "../src/lib/paperwork";
 import { allocValid, formatAlloc, parseAlloc, shareOf, slugify, weekStart } from "../src/lib/util";
 import { loadVault, personToMd } from "../src/lib/vault";
 import { MemoryFS } from "../src/lib/fs";
@@ -230,5 +231,73 @@ describe("Many Apply compatibility", () => {
     const ana = v.people.find((p) => p.slug === "ana-reyes")!;
     expect(ana.extra).toEqual({ obsidian_tag: "favorite" });
     expect(personToMd({ ...ana, phone: "555" })).toContain("obsidian_tag: favorite");
+  });
+});
+
+describe("paperwork", () => {
+  const today = "2026-11-26";
+  it("round-trips paperwork.md, keeping unknown keys", () => {
+    const d = blankDoc({ path: "paperwork/contracts/x", title: "X agreement", people: ["ana"], schedule: [{ amount: 100, due: "2026-12-01", payment_id: "" }], files: [{ label: "v1 sent", file: "v1-sent.pdf", added: today }] });
+    const md = docToMd({ ...d, extra: { custom: 1 } });
+    const back = docFromMd("paperwork/contracts/x", md);
+    expect(back).toEqual({ ...d, extra: { custom: 1 } });
+  });
+
+  it("flags what's missing in the sample vault", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const m = missingPaperwork(v, "", today);
+    const kinds = m.map((x) => `${x.kind}:${x.person ?? x.venue ?? x.project}`);
+    expect(kinds).toContain("agreement:maya-ostrowski"); // confirmed, agreement only sent
+    expect(kinds).not.toContain("agreement:ana-reyes"); // fully signed
+    expect(kinds).toContain("coi:uptown-studio-theatre"); // booked, no COI
+    expect(kinds).not.toContain("venue-agreement:uptown-studio-theatre");
+    expect(kinds).toContain("sponsorship:made-men-reading"); // Producer Hub, no agreement
+    expect(kinds).not.toContain("sponsorship:prodigy");
+    expect(kinds.some((k) => k.startsWith("expiring:"))).toBe(true); // COI expires in 25 days
+    // Maya is confirmed on two projects: one entry each.
+    expect(m.filter((x) => x.kind === "agreement" && x.person === "maya-ostrowski")).toHaveLength(2);
+    // Project filter.
+    expect(missingPaperwork(v, "made-men-reading", today).every((x) => !x.project || x.project === "made-men-reading")).toBe(true);
+  });
+
+  it("flags people paid with no W-9", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    v.ledger.push({ ...v.ledger[0], id: "z", kind: "expense", counterparty: "Jun Park", amount: 100, category: "Design", tags: [], notes: "" });
+    expect(missingPaperwork(v, "", today).some((x) => x.kind === "w9" && x.person === "jun-park")).toBe(true);
+  });
+
+  it("totals payments per payee for the 1099 tracker", () => {
+    const people = [{ name: "Ana Reyes", w9_on_file: true } as Person];
+    const l = [
+      entry({ id: "1", kind: "expense", amount: 1500, counterparty: "Ana Reyes", date: "2026-03-01" }),
+      entry({ id: "2", kind: "expense", amount: 700, counterparty: "ana reyes ", date: "2026-09-01" }),
+      entry({ id: "3", kind: "expense", amount: 900, counterparty: "Ana Reyes", date: "2025-09-01" }),
+      entry({ id: "4", kind: "expense", amount: 80, counterparty: "Fractured Atlas", category: "Sponsor fees", date: "2026-09-01" }),
+      entry({ id: "5", kind: "expense", amount: 300, counterparty: "Print shop", date: "2026-09-01" }),
+    ];
+    const rows = totals1099(l, people, [], "2026", 2000, [{ payee: "Ana Reyes", issued_date: "2027-01-20", notes: "" }]);
+    expect(rows.map((r) => [r.payee, r.total, r.needed, r.w9])).toEqual([["Ana Reyes", 2200, true, true], ["Print shop", 300, false, null]]);
+    expect(rows[0].issued?.issued_date).toBe("2027-01-20");
+    expect(list1099CSV(rows).split("\n")[1]).toBe("Ana Reyes,2200.00,yes,yes,2027-01-20");
+  });
+
+  it("fills templates and turns a fee schedule into payments", () => {
+    expect(fillTemplate("Hi [First name], [Fee] for [Role]. [Unknown]", { "first name": "Ana", Fee: "$1,500", Role: "" })).toBe("Hi Ana, $1,500 for [Role]. [Unknown]");
+    const sched = splitFee(1000, 3, "2026-12-01", 14);
+    expect(sched.map((s) => s.amount)).toEqual([333.33, 333.33, 333.34]);
+    expect(sched.map((s) => s.due)).toEqual(["2026-12-01", "2026-12-15", "2026-12-29"]);
+    const doc = blankDoc({ path: "paperwork/contracts/a", title: "Ana agreement", project: "prodigy", schedule: sched });
+    doc.schedule[0].payment_id = "already";
+    const { doc: d2, payments } = paymentsForSchedule(doc, "Ana Reyes", "overhead");
+    expect(payments).toHaveLength(2);
+    expect(payments[0]).toMatchObject({ payee: "Ana Reyes", category: "Artist fees", amount: 333.33, due: "2026-12-15", project_alloc: { prodigy: 1 } });
+    expect(payments[0].title).toBe("Ana agreement, installment 2 of 3");
+    expect(d2.schedule.every((s) => s.payment_id)).toBe(true);
+  });
+
+  it("seeds starter templates and renders drafts for printing", async () => {
+    const v = await loadVault(new MemoryFS({}));
+    expect(v.templates.map((t) => t.slug)).toContain("artist-agreement");
+    expect(markdownToHtml("# Title\n\nSome **bold** text\n\n- one\n- two")).toBe("<h1>Title</h1>\n<p>Some <strong>bold</strong> text</p>\n<ul>\n<li>one</li>\n<li>two</li>\n</ul>");
   });
 });

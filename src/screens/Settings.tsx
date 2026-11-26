@@ -44,6 +44,14 @@ export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
         )}
 
         <section className="card">
+          <div className="card-head"><h2>You</h2></div>
+          <div className="form-grid">
+            <Field label="Your name (fills [Producer])"><input value={s.producer_name} onChange={(e) => save({ producer_name: e.target.value })} /></Field>
+            <Field label="Company name (fills [Company])"><input value={s.company_name} onChange={(e) => save({ company_name: e.target.value })} /></Field>
+          </div>
+        </section>
+
+        <section className="card">
           <div className="card-head"><h2>Look</h2></div>
           <div className="form-grid">
             <Field label="Theme">
@@ -109,6 +117,7 @@ export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
           <ListEditor label="Expense categories" items={s.expense_categories} onChange={(v) => save({ expense_categories: v })} />
           <ListEditor label="Income categories" items={s.income_categories} onChange={(v) => save({ income_categories: v })} />
           <ListEditor label="Tags" items={s.tags} onChange={(v) => save({ tags: v })} />
+          <ListEditor label="Your own document types (added to the built-in list)" items={s.doc_types} onChange={(v) => save({ doc_types: v })} />
         </section>
 
         <section className="card">

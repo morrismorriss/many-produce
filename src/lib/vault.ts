@@ -17,6 +17,9 @@ import {
   type VaultData,
 } from "./types";
 import type { VaultFS } from "./fs";
+import { docFromMd, docToMd, issuedFromCSV, issuedToCSV, templateFromMd, templateToMd } from "./paperwork";
+import { STARTER_TEMPLATES } from "./starterTemplates";
+import type { Issued1099, PaperDoc, Template } from "./types";
 
 export const SETTINGS_PATH = ".manyproduce/settings.json";
 
@@ -130,6 +133,7 @@ function personFromDoc(slug: string, d: Record<string, unknown>, body: string): 
     pronouns: str(d.pronouns),
     payment_method: str(d.payment_method),
     w9_on_file: d.w9_on_file === true || d.w9_on_file === "yes",
+    w9_date: str(d.w9_date),
     notes: body.trim() || str(d.notes),
     extra: extraKeys(d, PERSON_KEYS),
   };
@@ -189,6 +193,9 @@ export function sponsorToMd(s: Sponsor): string {
 
 /** Make sure the built-in pieces exist (overhead project, sponsor presets, settings). */
 export async function initVault(fs: VaultFS): Promise<void> {
+  if (!(await fs.list("templates")).length) {
+    for (const t of STARTER_TEMPLATES) await fs.write(`templates/${t.slug}.md`, templateToMd(t));
+  }
   if ((await fs.read(`projects/${OVERHEAD_SLUG}/project.md`)) === null) {
     await fs.write(`projects/${OVERHEAD_SLUG}/project.md`, projectToMd(OVERHEAD_PROJECT));
   }
@@ -235,7 +242,30 @@ export async function loadVault(fs: VaultFS): Promise<VaultData> {
     /* keep defaults if the file is broken */
   }
 
-  return { projects, ledger, budgets, payments, people, venues, sponsors, settings };
+  // Paperwork: paperwork/contracts/<doc>/ and paperwork/tax/<year>/<doc>/
+  const docs: PaperDoc[] = [];
+  const readDocFolder = async (dir: string) => {
+    const text = await fs.read(`${dir}/paperwork.md`);
+    if (text !== null) docs.push(docFromMd(dir, text));
+  };
+  for (const e of await fs.list("paperwork/contracts")) if (e.is_dir) await readDocFolder(`paperwork/contracts/${e.name}`);
+  const issued1099: Record<string, Issued1099[]> = {};
+  for (const y of await fs.list("paperwork/tax")) {
+    if (!y.is_dir) continue;
+    for (const e of await fs.list(`paperwork/tax/${y.name}`)) {
+      if (e.is_dir) await readDocFolder(`paperwork/tax/${y.name}/${e.name}`);
+      else if (e.name === "1099s.csv") issued1099[y.name] = issuedFromCSV((await fs.read(`paperwork/tax/${y.name}/1099s.csv`)) ?? "");
+    }
+  }
+
+  const templates: Template[] = [];
+  for (const e of await fs.list("templates")) {
+    if (e.is_dir || !e.name.endsWith(".md")) continue;
+    const text = await fs.read(`templates/${e.name}`);
+    if (text !== null) templates.push(templateFromMd(e.name.replace(/\.md$/, ""), text));
+  }
+
+  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates };
 }
 
 // ---- writers ----
@@ -252,4 +282,7 @@ export const savePayments = (fs: VaultFS, slug: string, list: Payment[]) => fs.w
 export const savePerson = (fs: VaultFS, p: Person) => fs.write(`people/${p.slug}.md`, personToMd(p));
 export const saveVenue = (fs: VaultFS, v: Venue) => fs.write(`venues/${v.slug}.md`, venueToMd(v));
 export const saveSponsor = (fs: VaultFS, s: Sponsor) => fs.write(`sponsors/${s.slug}.md`, sponsorToMd(s));
+export const saveDoc = (fs: VaultFS, d: PaperDoc) => fs.write(`${d.path}/paperwork.md`, docToMd(d));
+export const saveIssued1099 = (fs: VaultFS, year: string, rows: Issued1099[]) => fs.write(`paperwork/tax/${year}/1099s.csv`, issuedToCSV(rows));
+export const saveTemplate = (fs: VaultFS, t: Template) => fs.write(`templates/${t.slug}.md`, templateToMd(t));
 export const saveSettings = (fs: VaultFS, s: Settings) => fs.write(SETTINGS_PATH, JSON.stringify(s, null, 2));

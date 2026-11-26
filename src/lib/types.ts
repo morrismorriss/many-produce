@@ -185,6 +185,16 @@ export interface Settings {
   threshold_1099: number; // user-set, since IRS rules change
   doc_types: string[];
   max_hours_week: number; // rehearsal hours per person per week before a warning; 0 = off
+  todoist: TodoistSettings;
+}
+
+export interface TodoistSettings {
+  enabled: boolean;
+  parent_project_id: string; // Todoist project the per-project projects live under ("" = top level)
+  parent_name: string;
+  sync: { timeline: boolean; payments: boolean; paperwork: boolean; shopping: boolean; campaigns: boolean; house_reports: boolean };
+  last_sync: string; // ISO time
+  last_error: string;
 }
 
 export const FISCAL_TAG = "Through fiscal sponsor";
@@ -212,6 +222,10 @@ export const DEFAULT_SETTINGS: Settings = {
   threshold_1099: 2000,
   doc_types: [],
   max_hours_week: 0,
+  todoist: {
+    enabled: false, parent_project_id: "", parent_name: "", last_sync: "", last_error: "",
+    sync: { timeline: true, payments: true, paperwork: true, shopping: true, campaigns: true, house_reports: true },
+  },
 };
 
 // ---- Paperwork ----

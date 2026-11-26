@@ -128,6 +128,16 @@ function useTheme() {
 function Frame({ onSwitchVault }: { onSwitchVault: () => void }) {
   const { screen, drawer, openDrawer, fireNewItem, fs, reload } = useApp();
 
+  // Todoist: sync when the app opens and every 15 minutes while it's open.
+  const todoistOn = useApp().data.settings.todoist.enabled;
+  useEffect(() => {
+    if (!todoistOn || fs.kind !== "desktop") return;
+    const run = () => void useStore.getState().syncTodoist(false);
+    const first = setTimeout(run, 3000);
+    const every = setInterval(run, 15 * 60 * 1000);
+    return () => { clearTimeout(first); clearInterval(every); };
+  }, [todoistOn, fs]);
+
   // Pick up edits made in other apps straight away.
   useEffect(() => {
     if (!fs.watch) return;

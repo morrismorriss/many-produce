@@ -112,6 +112,70 @@ fn vault_open_file(state: tauri::State<VaultState>, path: String) -> Result<(), 
     tauri_plugin_opener::open_path(p, None::<&str>).map_err(|e| e.to_string())
 }
 
+// ---- Todoist (optional) ----
+// The personal API token lives in the OS keychain, never in the vault, and
+// every request is made from here so the token never reaches the web view.
+
+const KEYCHAIN_SERVICE: &str = "Many Produce";
+const KEYCHAIN_USER: &str = "todoist";
+
+fn keychain() -> Result<keyring::Entry, String> {
+    keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_USER).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn todoist_set_token(token: String) -> Result<(), String> {
+    let t = token.trim();
+    if t.is_empty() {
+        return Err("The token is empty".into());
+    }
+    keychain()?.set_password(t).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn todoist_has_token() -> bool {
+    keychain().and_then(|k| k.get_password().map_err(|e| e.to_string())).is_ok()
+}
+
+#[tauri::command]
+fn todoist_clear_token() -> Result<(), String> {
+    match keychain()?.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// Call the Todoist API (v1). Only paths under /api/v1/ on api.todoist.com.
+#[tauri::command]
+async fn todoist_request(method: String, path: String, body: Option<serde_json::Value>) -> Result<serde_json::Value, String> {
+    if !path.starts_with("/api/v1/") || path.contains("..") {
+        return Err(format!("Path not allowed: {path}"));
+    }
+    let token = keychain()?.get_password().map_err(|_| "No Todoist token saved".to_string())?;
+    let url = format!("https://api.todoist.com{path}");
+    let client = reqwest::Client::new();
+    let req = match method.as_str() {
+        "GET" => client.get(&url),
+        "POST" => client.post(&url),
+        "DELETE" => client.delete(&url),
+        _ => return Err(format!("Method not allowed: {method}")),
+    };
+    let mut req = req.bearer_auth(token);
+    if let Some(b) = body {
+        req = req.json(&b);
+    }
+    let res = req.send().await.map_err(|e| format!("offline: {e}"))?;
+    let status = res.status();
+    let text = res.text().await.map_err(|e| e.to_string())?;
+    if !status.is_success() {
+        return Err(format!("HTTP {}: {}", status.as_u16(), text.chars().take(200).collect::<String>()));
+    }
+    if text.trim().is_empty() {
+        return Ok(serde_json::Value::Null);
+    }
+    serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
 const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 fn b64(bytes: &[u8]) -> String {
@@ -232,6 +296,10 @@ pub fn run() {
             vault_read_base64,
             export_file_base64,
             vault_open_file,
+            todoist_set_token,
+            todoist_has_token,
+            todoist_clear_token,
+            todoist_request,
             vault_read,
             vault_write,
             vault_list,

@@ -256,7 +256,8 @@ export async function loadVault(fs: VaultFS): Promise<VaultData> {
 
   let settings: Settings = DEFAULT_SETTINGS;
   try {
-    settings = { ...DEFAULT_SETTINGS, ...JSON.parse((await fs.read(SETTINGS_PATH)) ?? "{}") };
+    const raw = JSON.parse((await fs.read(SETTINGS_PATH)) ?? "{}");
+    settings = { ...DEFAULT_SETTINGS, ...raw, todoist: { ...DEFAULT_SETTINGS.todoist, ...(raw.todoist ?? {}), sync: { ...DEFAULT_SETTINGS.todoist.sync, ...(raw.todoist?.sync ?? {}) } } };
   } catch {
     /* keep defaults if the file is broken */
   }

@@ -3,7 +3,9 @@ import { earnedIncomeNote, isAutoFee, signedShare, totals } from "../lib/ledger"
 import { DIRECT_SOURCE, FISCAL_TAG, type Alloc, type EntryKind, type LedgerEntry } from "../lib/types";
 import { allocTouches, allocValid, fmtDate, round2, single, uid } from "../lib/util";
 import { useApp } from "../store";
-import { AllocTags, Chips, Empty, Field, Plus, Tile, saveTextFile } from "../components/bits";
+import { AllocTags, Chips, Empty, Field, Modal, Plus, Tile, saveTextFile } from "../components/bits";
+import { guessMapping, ledgerFromRows, type LedgerMapping } from "../lib/backup";
+import { parseCSV } from "../lib/files";
 import { Header } from "../components/Shell";
 import { ledgerToCSV } from "../lib/ledger";
 
@@ -12,6 +14,7 @@ type Filter = "All entries" | "Income" | "Expenses";
 export function Bookkeeping() {
   const { data, project, money, openDrawer, newItemSignal } = useApp();
   const [form, setForm] = useState<EntryKind | null>(null);
+  const [importing, setImporting] = useState(false);
   const [filter, setFilter] = useState<Filter>("All entries");
   const [category, setCategory] = useState("");
   const [tag, setTag] = useState("");
@@ -82,10 +85,12 @@ export function Bookkeeping() {
           <span className="muted">to</span>
           <input className="input" type="date" aria-label="To date" value={to} onChange={(e) => setTo(e.target.value)} />
           <div className="spacer" />
+          <button className="btn small" onClick={() => setImporting(true)}>Import CSV</button>
           <button className="btn small" onClick={() => saveTextFile(`ledger-${project || "all"}.csv`, ledgerToCSV(rows), "text/csv")}>
             Export CSV
           </button>
         </div>
+        {importing && <ImportLedger onClose={() => setImporting(false)} />}
 
         {rows.length ? (
           <table className="t">
@@ -350,5 +355,66 @@ function ReceiptPicker({ value, date, description, onChange }: { value: string; 
       <input className="input" style={{ flex: 1 }} value={value} onChange={(x) => onChange(x.target.value)} placeholder="No receipt attached" />
       <button className="btn small" onClick={pick}>Attach receipt</button>
     </div>
+  );
+}
+
+/** Bring in a bank or card statement, a spreadsheet, or another app's export. */
+function ImportLedger({ onClose }: { onClose: () => void }) {
+  const { data, project, saveEntry, deleteEntry, toast } = useApp();
+  const [text, setText] = useState("");
+  const rows = useMemo(() => (text.trim() ? parseCSV(text) : []), [text]);
+  const cols = rows.length ? Object.keys(rows[0]) : [];
+  const [map, setMap] = useState<LedgerMapping | null>(null);
+  const m = map ?? guessMapping(cols);
+  const [proj, setProj] = useState(project || data.projects.find((p) => !p.builtin)?.slug || "overhead");
+  const [source, setSource] = useState(data.settings.money_sources[0]?.name ?? "Checking");
+  const result = rows.length && m.date && (m.amount || m.moneyIn || m.moneyOut) ? ledgerFromRows(rows, m, proj, source, data.ledger) : null;
+  const sel = (label: string, key: keyof LedgerMapping, optional = true) => (
+    <Field label={label}>
+      <select value={m[key]} onChange={(e) => setMap({ ...m, [key]: e.target.value })}>
+        <option value="">{optional ? "—" : "Choose…"}</option>
+        {cols.map((c) => <option key={c}>{c}</option>)}
+      </select>
+    </Field>
+  );
+  const run = async () => {
+    if (!result) return;
+    for (const e of result.entries) await saveEntry(e);
+    const ids = result.entries.map((e) => e.id);
+    toast(`Imported ${ids.length} entries${result.skipped ? `, skipped ${result.skipped} already in the ledger` : ""}`, () => { for (const id of ids) void deleteEntry(id); });
+    onClose();
+  };
+  return (
+    <Modal title="Import a statement or spreadsheet" onClose={onClose}>
+      <p className="muted small">Export a CSV from your bank, card, PayPal, Venmo or a spreadsheet. Match the columns, pick the project and where the money sat, then check the preview. Entries already in the ledger (same date, amount and description) are skipped, and you can undo the import right after.</p>
+      <input type="file" accept=".csv,text/csv" aria-label="Choose a CSV file" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setText(await f.text()); setMap(null); } }} />
+      <textarea className="input" style={{ minHeight: 70, fontFamily: "ui-monospace, monospace", fontSize: 12 }} aria-label="CSV text" value={text} onChange={(e) => { setText(e.target.value); setMap(null); }} />
+      {cols.length > 0 && (
+        <div className="form-grid">
+          {sel("Date", "date", false)}
+          {sel("Description", "description")}
+          {sel("Amount (one signed column)", "amount")}
+          {!m.amount && sel("Money in column", "moneyIn")}
+          {!m.amount && sel("Money out column", "moneyOut")}
+          {m.amount && (
+            <Field label="Negative amounts are">
+              <select value={m.negativeIs} onChange={(e) => setMap({ ...m, negativeIs: e.target.value as LedgerMapping["negativeIs"] })}><option value="expense">money out</option><option value="income">money in</option></select>
+            </Field>
+          )}
+          {sel("Category (optional)", "category")}
+          <Field label="Project"><select value={proj} onChange={(e) => setProj(e.target.value)}>{data.projects.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}</select></Field>
+          <Field label="Money source"><select value={source} onChange={(e) => setSource(e.target.value)}>{data.settings.money_sources.map((s) => <option key={s.name}>{s.name}</option>)}</select></Field>
+        </div>
+      )}
+      {result && (
+        <div className="card" style={{ background: "var(--surface)" }}>
+          <p className="small"><strong>{result.entries.length}</strong> new entries{result.skipped ? ` · ${result.skipped} already in the ledger` : ""}{result.bad ? ` · ${result.bad} rows without a date or amount` : ""}</p>
+          <table className="t"><tbody>{result.entries.slice(0, 6).map((e) => <tr key={e.id}><td className="num small">{e.date}</td><td className="small">{e.description}</td><td className="small muted">{e.category}</td><td className={`r num small ${e.kind === "income" ? "in" : ""}`}>{e.kind === "income" ? "+" : "−"}{e.amount.toFixed(2)}</td></tr>)}</tbody></table>
+          {result.entries.length > 6 && <p className="small muted">…and {result.entries.length - 6} more.</p>}
+          <p className="small muted">Imported entries get the category from the file (or Other). Open any of them afterwards to tag, split or attach a receipt.</p>
+        </div>
+      )}
+      <div className="toolbar"><div className="spacer" /><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={!result?.entries.length} onClick={() => void run()}>Import {result?.entries.length || ""}</button></div>
+    </Modal>
   );
 }

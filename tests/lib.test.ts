@@ -23,6 +23,8 @@ import { allocValid, formatAlloc, parseAlloc, shareOf, slugify, weekStart } from
 import { loadVault, personToMd } from "../src/lib/vault";
 import { activeGoal, campaignFromMd, campaignRaised, campaignStats, campaignToMd, newCampaignPath, resultLine } from "../src/lib/campaigns";
 import { MemoryFS } from "../src/lib/fs";
+import { EMPTY_STATE, runSync, wantedTasks } from "../src/lib/todoist";
+import { collectVault, exportAllCSV, guessMapping, ledgerFromRows } from "../src/lib/backup";
 import { addDay, boardWarnings, castNumbers, dayOutOfDays, dayPages, moveStrip, parseFdx, parseScreenplayText, shootDayEvents, sortUnscheduled, stripsFromCSV, stripsToCSV } from "../src/lib/stripboard";
 import { clearanceWarnings, clearancesFromCSV, clearancesToCSV, cueSheetCSV, sceneClearance } from "../src/lib/clearances";
 import {
@@ -627,5 +629,111 @@ describe("clearances", () => {
     const cue = cueSheetCSV("Night Shift", items).split("\n");
     expect(cue[0]).toBe("cue,title,composer,publisher,rights_holder,timing,usage,scenes,status");
     expect(cue[1]).toContain("J. Ortiz");
+  });
+});
+
+/** A tiny in-memory Todoist, enough to exercise the sync. */
+function fakeTodoist() {
+  let n = 0;
+  const projects: { id: string; name: string; parent_id: string | null }[] = [];
+  const sections: { id: string; name: string; project_id: string }[] = [];
+  const tasks: { id: string; content: string; project_id: string; section_id?: string; due_date?: string; checked: boolean }[] = [];
+  const calls: string[] = [];
+  const api = {
+    async request(method: string, path: string, body?: Record<string, string>) {
+      calls.push(`${method} ${path}`);
+      const [p, q] = path.split("?");
+      const qp = new URLSearchParams(q ?? "");
+      if (method === "GET" && p === "/api/v1/projects") return { results: projects, next_cursor: null };
+      if (method === "POST" && p === "/api/v1/projects") { const x = { id: `p${++n}`, name: body!.name, parent_id: body!.parent_id ?? null }; projects.push(x); return x; }
+      if (method === "GET" && p === "/api/v1/sections") return { results: sections.filter((s) => s.project_id === qp.get("project_id")) };
+      if (method === "POST" && p === "/api/v1/sections") { const x = { id: `s${++n}`, name: body!.name, project_id: body!.project_id }; sections.push(x); return x; }
+      if (method === "GET" && p === "/api/v1/tasks") return { results: tasks.filter((t) => t.project_id === qp.get("project_id") && !t.checked) };
+      if (method === "POST" && p === "/api/v1/tasks") { const x = { id: `t${++n}`, content: body!.content, project_id: body!.project_id, section_id: body!.section_id, due_date: body!.due_date, checked: false }; tasks.push(x); return x; }
+      const m = /^\/api\/v1\/tasks\/(\w+)(\/close)?$/.exec(p);
+      if (m && method === "POST") { const t = tasks.find((x) => x.id === m[1])!; if (m[2]) t.checked = true; else Object.assign(t, { content: body!.content, due_date: body!.due_date }); return null; }
+      if (m && method === "DELETE") { tasks.splice(tasks.findIndex((x) => x.id === m[1]), 1); return null; }
+      throw new Error(`unexpected ${method} ${path}`);
+    },
+  };
+  return { api, projects, sections, tasks, calls };
+}
+
+describe("todoist sync", () => {
+  const today = "2026-11-26";
+  it("creates projects, sections and tasks, then updates, closes and picks up completions", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const settings = { ...v.settings.todoist, enabled: true, parent_project_id: "" };
+    const money = (n: number) => "$" + n;
+    const wanted = wantedTasks(v, settings, today, money);
+    const keys = wanted.map((w) => w.key);
+    expect(keys).toContain("payment:p2");
+    expect(keys).toContain("shop:sh2"); // producer is buying it
+    expect(keys).not.toContain("shop:sh3"); // Maya is
+    expect(keys.some((k) => k.startsWith("timeline:prodigy:"))).toBe(true);
+    expect(keys).toContain("house:prodigy:" + v.events.find((e) => e.id === "ev8")!.date);
+    expect(keys).toContain("chase:paperwork/contracts/prodigy-maya-ostrowski-actor-agreement");
+    expect(wanted.find((w) => w.key === "payment:p2")!.content).toBe("Pay Ana Reyes: $500");
+
+    const t = fakeTodoist();
+    const names = Object.fromEntries(v.projects.map((p) => [p.slug, p.name]));
+    const r1 = await runSync(t.api, wanted, names, settings, EMPTY_STATE);
+    expect(r1.created).toBe(wanted.length);
+    expect(t.projects.map((p) => p.name).sort()).toEqual([...new Set(wanted.map((w) => names[w.project]))].sort());
+    expect(t.sections.some((s) => s.name === "Payments")).toBe(true);
+
+    // Nothing changed: a second sync does nothing.
+    const r2 = await runSync(t.api, wanted, names, settings, r1.state);
+    expect([r2.created, r2.updated, r2.closed, r2.completedInTodoist.length]).toEqual([0, 0, 0, 0]);
+
+    // Due date changed in the app → update; one item done in the app → close;
+    // one ticked off in Todoist → reported back.
+    const shopId = r1.state.tasks["shop:sh2"].id;
+    t.tasks.find((x) => x.id === shopId)!.checked = true;
+    const changed = wanted
+      .filter((w) => w.key !== "payment:p4")
+      .map((w) => (w.key === "payment:p2" ? { ...w, due: "2026-12-01" } : w));
+    const r3 = await runSync(t.api, changed, names, settings, r2.state);
+    expect(r3.updated).toBe(1);
+    expect(r3.closed).toBe(1);
+    expect(r3.completedInTodoist).toEqual(["shop:sh2"]);
+    expect(t.tasks.find((x) => x.id === r1.state.tasks["payment:p2"].id)!.due_date).toBe("2026-12-01");
+  });
+
+  it("respects the sync toggles", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const off = { ...v.settings.todoist, sync: { timeline: false, payments: true, paperwork: false, shopping: false, campaigns: false, house_reports: false } };
+    expect(wantedTasks(v, off, today, String).every((w) => w.section === "Payments")).toBe(true);
+  });
+});
+
+describe("backup and import", () => {
+  const today = "2026-11-26";
+  it("zips every vault file and exports CSVs", async () => {
+    const fs = new MemoryFS(sampleVault(today));
+    const v = await loadVault(fs);
+    const files = await collectVault(fs);
+    expect(Object.keys(files)).toContain("ledger/2026.csv");
+    expect(Object.keys(files)).toContain(".manyproduce/settings.json");
+    const csv = exportAllCSV(v);
+    expect(Object.keys(csv)).toEqual(expect.arrayContaining(["ledger.csv", "collaborators.csv", "schedule.csv", "clearances.csv"]));
+    expect(csv["collaborators.csv"].split("\n")[1]).toContain("Ana Reyes");
+  });
+  it("imports a bank statement, skipping what's already there", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const rows = [
+      { Date: "11/20/2026", Description: "GRAND STAGE RENTALS", Amount: "-120.00" },
+      { Date: "11/21/2026", Description: "Venmo from Lee", Amount: "50" },
+      { Date: "", Description: "pending", Amount: "-3" },
+    ];
+    const m = guessMapping(Object.keys(rows[0]));
+    expect(m).toMatchObject({ date: "Date", description: "Description", amount: "Amount" });
+    const r = ledgerFromRows(rows, m, "prodigy", "Card", v.ledger);
+    expect(r.entries.map((e) => [e.date, e.kind, e.amount])).toEqual([["2026-11-20", "expense", 120], ["2026-11-21", "income", 50]]);
+    expect(r.bad).toBe(1);
+    const again = ledgerFromRows(rows, m, "prodigy", "Card", [...v.ledger, ...r.entries]);
+    expect(again.skipped).toBe(2);
+    const split = ledgerFromRows([{ Date: "2026-11-22", Memo: "x", Debit: "10", Credit: "" }], guessMapping(["Date", "Memo", "Debit", "Credit"]), "prodigy", "Card", []);
+    expect(split.entries[0]).toMatchObject({ kind: "expense", amount: 10 });
   });
 });

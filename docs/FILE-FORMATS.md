@@ -41,6 +41,7 @@ Many Produce/
     <project>.md          # milestones and tasks, relative to opening
     timeline-templates/<slug>.md
   .manyproduce/
+    todoist.json          # Todoist sync state: which Todoist project, section and task each item maps to
     settings.json
     trash/              # nothing is hard-deleted; it lands here
 ```
@@ -338,8 +339,12 @@ id,item,type,scenes,owner,contact,scope,territory,term,fee,status,requested,clea
 
 `status` is one of `Needed`, `Requested`, `Negotiating`, `Cleared`, `Denied`, `Replaced` or `Not needed`. `scope` and `scenes` are semicolon-separated. `document` is the Paperwork folder of the signed release. Where a project will be shown is stored in `project.md` as `planned_uses`.
 
+## .manyproduce/todoist.json
+
+`projects` (project slug → Todoist project id), `sections` ("slug|Section" → section id) and `tasks` (item key such as `payment:p3` or `timeline:prodigy:t12` → `{ id, hash, project }`). The mapping lives here rather than in each item's file, so nothing else changes when sync is turned on or off. The token itself is in the OS keychain (service "Many Produce"), never in the vault.
+
 ## .manyproduce/settings.json
 
-This file holds the currency, theme, low-balance `cushion`, `money_sources` (each with `name`, `opening_balance`, `opening_date`, and an optional `sponsor` slug for sponsor funds), the category and tag lists, the last selected project, the forecast length, `producer_name` and `company_name` (used in templates), `threshold_1099` (the 1099 reporting threshold, which you can change because IRS rules change) `doc_types` (your own document types) and `max_hours_week` (the weekly hours-called warning; 0 = off).
+This file holds the currency, theme, low-balance `cushion`, `money_sources` (each with `name`, `opening_balance`, `opening_date`, and an optional `sponsor` slug for sponsor funds), the category and tag lists, the last selected project, the forecast length, `producer_name` and `company_name` (used in templates), `threshold_1099` (the 1099 reporting threshold, which you can change because IRS rules change) `doc_types` (your own document types) `max_hours_week` (the weekly hours-called warning; 0 = off) and `todoist` (`enabled`, `parent_project_id`, the per-kind `sync` toggles, `last_sync`, `last_error`).
 
 A source's current balance is its opening balance plus every ledger entry on that source dated on or after `opening_date`.

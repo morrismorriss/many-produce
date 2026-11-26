@@ -7,6 +7,7 @@ import type { VaultFS } from "./lib/fs";
 import { removeWithFees, upsertWithFees } from "./lib/ledger";
 import { ledgerEntryForPayment } from "./lib/payments";
 import { newDocPath, paymentsForSchedule } from "./lib/paperwork";
+import { EMPTY_STATE, deleteAllTasks, desktopApi, runSync, wantedTasks, type SyncState } from "./lib/todoist";
 import type { Board, Campaign, Clearance, DailyReport, HouseReport, SavedReport, StripScene } from "./lib/types";
 import { newCampaignPath } from "./lib/campaigns";
 import type { Checkout, Conflict, InventoryItem, Scene, ScheduleEvent, ShoppingItem, TimelineTask, TimelineTemplate } from "./lib/types";
@@ -104,6 +105,11 @@ interface State {
   saveStrips: (project: string, s: StripScene[]) => Promise<void>;
   saveBoard: (project: string, b: Board) => Promise<void>;
   saveClearances: (project: string, c: Clearance[]) => Promise<void>;
+  /** Payments Todoist says are done; the user confirms the amount before they're marked paid. */
+  todoistToConfirm: string[];
+  syncTodoist: (manual?: boolean) => Promise<void>;
+  todoistTurnOff: (deleteTasks: boolean) => Promise<void>;
+  dismissTodoistConfirm: (paymentId: string) => void;
   reload: (quiet?: boolean) => Promise<void>;
 }
 
@@ -470,6 +476,69 @@ export const useStore = create<State>()((set, get) => {
     saveClearances: async (project, c) => {
       patch((d) => ({ clearances: { ...d.clearances, [project]: c } }));
       await vault.saveClearances(get().fs, project, c).catch(fail);
+    },
+
+    todoistToConfirm: [],
+    dismissTodoistConfirm: (id) => set((st) => ({ todoistToConfirm: st.todoistToConfirm.filter((x) => x !== id) })),
+    syncTodoist: async (manual) => {
+      const { fs, data } = get();
+      const ts = data.settings.todoist;
+      if (fs.kind !== "desktop" || !ts.enabled) {
+        if (manual) get().toast(fs.kind !== "desktop" ? "Todoist sync works in the desktop app." : "Turn on Todoist sync first.");
+        return;
+      }
+      const statePath = ".manyproduce/todoist.json";
+      let prev: SyncState = EMPTY_STATE;
+      try { prev = { ...EMPTY_STATE, ...JSON.parse((await fs.read(statePath)) ?? "{}") }; } catch { /* start fresh */ }
+      const today = todayISO();
+      const money = (n: number) => fmtMoney(n, data.settings.currency);
+      try {
+        const api = await desktopApi();
+        const wanted = wantedTasks(data, ts, today, money);
+        const names = Object.fromEntries(data.projects.map((p) => [p.slug, p.name]));
+        const res = await runSync(api, wanted, names, ts, prev);
+        await fs.write(statePath, JSON.stringify(res.state, null, 2));
+        // Completion in Todoist wins.
+        const confirm: string[] = [];
+        for (const key of res.completedInTodoist) {
+          const [kind, ...rest] = key.split(":");
+          const d = get().data;
+          if (kind === "timeline") {
+            const [slug, id] = rest;
+            const list = d.timelines[slug] ?? [];
+            if (list.some((t) => t.id === id)) await get().saveTimeline(slug, list.map((t) => (t.id === id ? { ...t, status: "Done" as const } : t)));
+          } else if (kind === "payment") {
+            if (Object.values(d.payments).flat().some((p) => p.id === rest[0] && p.status !== "paid")) confirm.push(rest[0]);
+          } else if (kind === "shop") {
+            const item = Object.values(d.shopping).flat().find((i) => i.id === rest[0]);
+            if (item && item.status === "Needed") await get().setGotIt(item, true);
+          } else if (kind === "campaign") {
+            const c = d.campaigns.find((x) => x.path === rest.join(":"));
+            if (c && c.status !== "Done") await get().saveCampaign({ ...c, status: "Done" });
+          }
+        }
+        set((st) => ({ todoistToConfirm: [...new Set([...st.todoistToConfirm, ...confirm])] }));
+        await get().saveSettings({ ...get().data.settings, todoist: { ...get().data.settings.todoist, last_sync: new Date().toISOString(), last_error: "" } });
+        if (manual) get().toast(`Todoist: ${res.created} added, ${res.updated} updated, ${res.closed} closed${res.completedInTodoist.length ? `, ${res.completedInTodoist.length} finished in Todoist` : ""}`);
+      } catch (e) {
+        const msg = String(e);
+        await get().saveSettings({ ...get().data.settings, todoist: { ...get().data.settings.todoist, last_error: msg.includes("offline") ? "Offline. Changes will sync next time." : msg } });
+        if (manual) get().toast(msg.includes("offline") ? "Offline: changes will sync next time." : `Todoist sync failed: ${msg}`);
+      }
+    },
+    todoistTurnOff: async (deleteTasks) => {
+      const { fs } = get();
+      if (deleteTasks && fs.kind === "desktop") {
+        try {
+          const state = { ...EMPTY_STATE, ...JSON.parse((await fs.read(".manyproduce/todoist.json")) ?? "{}") } as SyncState;
+          const n = await deleteAllTasks(await desktopApi(), state);
+          await fs.write(".manyproduce/todoist.json", JSON.stringify({ ...state, tasks: {} }, null, 2));
+          get().toast(`Removed ${n} tasks from Todoist`);
+        } catch (e) {
+          get().toast(`Couldn't remove tasks: ${String(e)}`);
+        }
+      }
+      await get().saveSettings({ ...get().data.settings, todoist: { ...get().data.settings.todoist, enabled: false } });
     },
 
     reload: async (quiet) => {

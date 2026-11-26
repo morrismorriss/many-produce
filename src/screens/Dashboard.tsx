@@ -218,6 +218,18 @@ export function Dashboard() {
                   <button className="btn small" onClick={() => setScreen("reports")}>Fill in</button>
                 </li>
               ))}
+              {app.todoistToConfirm.map((id) => {
+                const pay = allPayments.find((x) => x.id === id);
+                if (!pay) return null;
+                return (
+                  <li key={"td" + id}>
+                    <span className="pill blue">Todoist</span>
+                    <span>You ticked off &quot;{pay.title}&quot; in Todoist. Paid {money(pay.amount, { cents: true })}?</span>
+                    <button className="btn small primary" onClick={() => { void app.setPaid(id, true); app.dismissTodoistConfirm(id); }}>Yes, mark paid</button>
+                    <button className="btn small" onClick={() => { setScreen("payments"); openDrawer({ kind: "payment", id }); app.dismissTodoistConfirm(id); }}>Change amount</button>
+                  </li>
+                );
+              })}
               {clearWarn.length > 0 && (
                 <li>
                   <span className="pill red">Clearances</span>
@@ -246,14 +258,14 @@ export function Dashboard() {
                   <button className="btn small" onClick={() => setLow(l)}>Fix</button>
                 </li>
               ))}
-              {!overdue.length && !missing.length && !firstLowPerSource.length && !overdueTasks.length && !toReimburse && !gear.length && !noHouse.length && !noDaily.length && !clearWarn.length && <li className="muted">Nothing needs attention. Nice.</li>}
+              {!overdue.length && !missing.length && !firstLowPerSource.length && !overdueTasks.length && !toReimburse && !gear.length && !noHouse.length && !noDaily.length && !clearWarn.length && !app.todoistToConfirm.length && <li className="muted">Nothing needs attention. Nice.</li>}
             </ul>
             {missing.length > 0 && (
               <div style={{ marginTop: 8 }}>
                 <MissingList missing={missing} compact={!!project} />
               </div>
             )}
-            <p className="small muted" style={{ marginTop: 10 }}>Sponsor report due dates join this list with Todoist sync.</p>
+            <p className="small muted" style={{ marginTop: 10 }}>Sponsor report due dates aren't tracked yet.</p>
           </section>
 
           <section className="card" aria-label="This week">

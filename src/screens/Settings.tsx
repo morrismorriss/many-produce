@@ -5,9 +5,13 @@ import { useApp } from "../store";
 import { EditCell, Field } from "../components/bits";
 import { Header, ProjectModal } from "../components/Shell";
 import { MemoryFS } from "../lib/fs";
+import { strToU8, zipSync } from "fflate";
+import { collectVault, exportAllCSV } from "../lib/backup";
+import { saveBinaryFile } from "../components/bits";
+import { TodoistSettings } from "./TodoistSettings";
 
 export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
-  const { data, saveSettings, saveSponsor, fs, reload, projectBySlug, project, money } = useApp();
+  const { data, saveSettings, saveSponsor, fs, reload, projectBySlug, project, money, toast } = useApp();
   const s = data.settings;
   const save = (patch: Partial<S>) => void saveSettings({ ...s, ...patch });
   const [editProject, setEditProject] = useState(false);
@@ -100,6 +104,18 @@ export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
           </div>
           <p className="small muted">The forecast warns when your total balance drops below {money(s.cushion)}, or any source goes below zero.</p>
         </section>
+
+        <section className="card">
+          <div className="card-head"><h2>Backup and export</h2></div>
+          <p className="small muted">Your vault is already plain files you own. A backup zips the whole folder (receipts and signed PDFs included); the CSV export flattens everything into spreadsheets.</p>
+          <div className="toolbar">
+            <button className="btn" onClick={async () => { const files = await collectVault(fs); await saveBinaryFile(`many-produce-backup-${new Date().toISOString().slice(0, 10)}.zip`, zipSync(files)); toast(`Backed up ${Object.keys(files).length} files`); }}>Back up vault (zip)</button>
+            <button className="btn" onClick={async () => { const csv = exportAllCSV(data); await saveBinaryFile(`many-produce-export-${new Date().toISOString().slice(0, 10)}.zip`, zipSync(Object.fromEntries(Object.entries(csv).map(([k, v]) => [k, strToU8(v)])))); }}>Export everything to CSV (zip)</button>
+          </div>
+          <p className="small muted">To bring in a bank or card statement, use Import CSV on Bookkeeping → Ledger. Budgets import on Bookkeeping → Budget, availability on Schedule → Availability.</p>
+        </section>
+
+        <TodoistSettings />
 
         <section className="card">
           <div className="card-head"><h2>Schedule</h2></div>

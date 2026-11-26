@@ -21,7 +21,8 @@ import { docToMd } from "./paperwork";
 import { conflictsToCSV, eventsToCSV, scenesToCSV } from "./schedule";
 import { shoppingToCSV } from "./shopping";
 import { checkoutsToCSV, itemsToCSV } from "./inventory";
-import type { InventoryItem, ShoppingItem } from "./types";
+import type { Campaign, InventoryItem, ShoppingItem } from "./types";
+import { campaignToMd } from "./campaigns";
 import { STARTER_TIMELINE_TEMPLATES, applyTemplate, timelineToMd } from "./timeline";
 import { OVERHEAD_PROJECT, PRESET_SPONSORS, SETTINGS_PATH, personToMd, projectToMd, sponsorToMd, venueToMd } from "./vault";
 
@@ -266,6 +267,19 @@ export function sampleVault(today = todayISO()): Record<string, string> {
     { id: "co1", item: "it1", person: "dev-okafor", out_date: d(-20), due_date: d(-6), in_date: "", condition_out: "Good", condition_in: "", notes: "For recording the read-through" },
     { id: "co2", item: "it2", person: "ana-reyes", out_date: d(-10), due_date: "", in_date: "", condition_out: "", condition_in: "", notes: "" },
   ]);
+
+  // Campaigns
+  const camp = (path: string, x: Partial<Campaign>) => {
+    files[path] = campaignToMd({
+      path, title: "", type: "Fundraising", project: "prodigy", channel: "Email", status: "Ideas", date: "", end_date: "", template: "",
+      goal: null, asks_sent: null, responses: null, result_amount: null, result_notes: "", linked_entries: [], body: "", ...x,
+    });
+  };
+  camp(`campaigns/${d(-34)}-early-donor-asks.md`, { title: "Early donor asks", status: "Done", date: d(-40), template: "ask-first-time", asks_sent: 22, responses: 9, linked_entries: ["e1"], body: "Personal emails to past audience and friends." });
+  camp(`campaigns/${d(5)}-giving-tuesday.md`, { title: "Giving Tuesday push", status: "Scheduled", channel: "Newsletter", date: d(5), end_date: d(52), goal: 6000, template: "cta-newsletter-ps", body: "Newsletter + three Instagram posts. Matching gift from the board if we hit $1,000 in a day." });
+  camp(`campaigns/${d(12)}-cast-announcement.md`, { title: "Cast announcement", type: "Marketing", status: "Drafting", channel: "Instagram", date: d(12), template: "cta-instagram" });
+  camp(`campaigns/${d(60)}-reading-invite.md`, { title: "Reading invite", type: "Marketing", project: "made-men-reading", status: "Ideas", channel: "Email", date: d(60) });
+  camp(`campaigns/${d(-12)}-reading-sponsor.md`, { title: "Reading sponsor ask", project: "made-men-reading", status: "Done", channel: "In person", date: d(-14), asks_sent: 3, responses: 1, linked_entries: ["e5"] });
 
   // Paperwork
   const doc = (path: string, x: Partial<PaperDoc>) => {

@@ -23,7 +23,8 @@ import type { Conflict, Issued1099, PaperDoc, Scene, ScheduleEvent, Template, Ti
 import { conflictsFromCSV, conflictsToCSV, eventsFromCSV, eventsToCSV, scenesFromCSV, scenesToCSV } from "./schedule";
 import { shoppingFromCSV, shoppingToCSV } from "./shopping";
 import { checkoutsFromCSV, checkoutsToCSV, itemsFromCSV, itemsToCSV } from "./inventory";
-import type { Checkout, InventoryItem, ShoppingItem } from "./types";
+import type { Campaign, Checkout, InventoryItem, ShoppingItem } from "./types";
+import { campaignFromMd, campaignToMd } from "./campaigns";
 import { STARTER_TIMELINE_TEMPLATES, timelineFromMd, timelineTemplateFromMd, timelineTemplateToMd, timelineToMd } from "./timeline";
 
 export const SETTINGS_PATH = ".manyproduce/settings.json";
@@ -303,7 +304,13 @@ export async function loadVault(fs: VaultFS): Promise<VaultData> {
   const inventory: InventoryItem[] = itemsFromCSV((await fs.read("inventory/items.csv")) ?? "");
   const checkouts: Checkout[] = checkoutsFromCSV((await fs.read("inventory/checkouts.csv")) ?? "");
 
-  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates, events, conflicts, scenes, timelines, timelineTemplates, shopping, inventory, checkouts };
+  const campaigns: Campaign[] = [];
+  for (const e of await fs.list("campaigns")) {
+    if (e.is_dir || !e.name.endsWith(".md")) continue;
+    campaigns.push(campaignFromMd(`campaigns/${e.name}`, (await fs.read(`campaigns/${e.name}`)) ?? ""));
+  }
+
+  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates, events, conflicts, scenes, timelines, timelineTemplates, shopping, inventory, checkouts, campaigns };
 }
 
 // ---- writers ----
@@ -331,4 +338,5 @@ export const saveTimelineTemplate = (fs: VaultFS, t: TimelineTemplate) => fs.wri
 export const saveShopping = (fs: VaultFS, project: string, items: ShoppingItem[]) => fs.write(`projects/${project}/shopping.csv`, shoppingToCSV(items));
 export const saveInventory = (fs: VaultFS, items: InventoryItem[]) => fs.write("inventory/items.csv", itemsToCSV(items));
 export const saveCheckouts = (fs: VaultFS, c: Checkout[]) => fs.write("inventory/checkouts.csv", checkoutsToCSV(c));
+export const saveCampaign = (fs: VaultFS, c: Campaign) => fs.write(c.path, campaignToMd(c));
 export const saveSettings = (fs: VaultFS, s: Settings) => fs.write(SETTINGS_PATH, JSON.stringify(s, null, 2));

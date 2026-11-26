@@ -26,6 +26,7 @@ Many Produce/
     <project>.csv         # rehearsals, tech, performances, meetings
     <project>-scenes.csv  # scene breakdown (who's in each scene)
     conflicts.csv         # each person's unavailable dates and times
+  campaigns/<date>-<slug>.md  # marketing and fundraising campaigns
   inventory/
     items.csv             # Equipment log items (owned, borrowed, rented)
     checkouts.csv         # who has what, when it's due back, condition out/in
@@ -244,6 +245,28 @@ id,item,person,out_date,due_date,in_date,condition_out,condition_in,notes
 ```
 
 A blank `in_date` means it's still out.
+
+## campaigns/&lt;date&gt;-&lt;slug&gt;.md
+
+```yaml
+---
+title: Giving Tuesday push
+type: Fundraising            # Fundraising | Marketing
+project: prodigy
+channel: Newsletter
+status: Scheduled            # Ideas | Drafting | Scheduled | Done
+date: 2026-12-01
+end_date: 2027-01-17         # optional; with a goal, the Campaigns goal tracker counts gifts between the dates
+template: cta-newsletter-ps
+goal: 6000
+asks_sent: 120
+responses: 14
+result_amount: null          # typed-in result; otherwise filled from linked_entries
+result_notes: ""
+linked_entries: [e12, e15]   # Bookkeeping entries this campaign brought in
+---
+The draft or notes.
+```
 
 ## .manyproduce/settings.json
 

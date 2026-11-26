@@ -17,8 +17,8 @@ export const NAV: { id: Screen; label: string; phase?: number }[] = [
   { id: "paperwork", label: "Paperwork" },
   { id: "schedule", label: "Schedule" }, // calendar, availability, scenes and the timeline
   { id: "inventory", label: "Equipment log" },
-  { id: "campaigns", label: "Campaigns", phase: 7 },
-  { id: "templates", label: "Templates", phase: 7 },
+  { id: "campaigns", label: "Campaigns" },
+  { id: "templates", label: "Templates" },
   { id: "reports", label: "Reports", phase: 8 },
   { id: "settings", label: "Settings" },
 ];

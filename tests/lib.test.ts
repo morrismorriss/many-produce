@@ -21,6 +21,7 @@ import { STARTER_TIMELINE_TEMPLATES, anchorsFor, applyTemplate, relLabel, resolv
 import { blankDoc, docFromMd, docToMd, fillTemplate, list1099CSV, markdownToHtml, missingPaperwork, paymentsForSchedule, splitFee, totals1099 } from "../src/lib/paperwork";
 import { allocValid, formatAlloc, parseAlloc, shareOf, slugify, weekStart } from "../src/lib/util";
 import { loadVault, personToMd } from "../src/lib/vault";
+import { activeGoal, campaignFromMd, campaignRaised, campaignStats, campaignToMd, newCampaignPath, resultLine } from "../src/lib/campaigns";
 import { MemoryFS } from "../src/lib/fs";
 import { sampleVault } from "../src/lib/seed";
 
@@ -476,6 +477,27 @@ describe("equipment log", () => {
     const w = gearWarnings(items, checkouts, people, projects, () => "2026-11-15", "2026-11-26");
     expect(w.map((x) => x.kind).sort()).toEqual(["after-closing", "deposit", "overdue", "rental-due"]);
     expect(holderOf("1", checkouts)?.person).toBe("ana");
-    expect(rentalOrders(items).map((o) => o.house)).toEqual(["Lens Co", "Grip Co"].sort((a, b) => a.localeCompare(b)).length ? expect.arrayContaining(["Lens Co", "Grip Co"]) : []);
+    expect(rentalOrders(items).map((o) => o.house)).toEqual(expect.arrayContaining(["Lens Co", "Grip Co"]));
+  });
+});
+
+describe("campaigns", () => {
+  const today = "2026-11-26";
+  it("round-trips campaign files", () => {
+    const c = campaignFromMd("campaigns/x.md", "---\ntitle: Giving Tuesday\ntype: Fundraising\nstatus: Scheduled\ngoal: 6000\nlinked_entries: [e1]\nfoo: bar\n---\nBody");
+    expect(c).toMatchObject({ title: "Giving Tuesday", status: "Scheduled", goal: 6000, linked_entries: ["e1"], body: "Body", extra: { foo: "bar" } });
+    expect(campaignFromMd("campaigns/x.md", campaignToMd(c))).toEqual(c);
+    expect(newCampaignPath({ title: "Giving Tuesday!", date: "2026-12-01" }, [])).toBe("campaigns/2026-12-01-giving-tuesday.md");
+  });
+  it("fills results from linked entries or dates, and finds the active goal", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const early = v.campaigns.find((c) => c.title === "Early donor asks")!;
+    expect(campaignRaised(early, v.ledger)).toMatchObject({ amount: 1500, gifts: 1, source: "linked" });
+    expect(resultLine(early, v.ledger, (n) => "$" + n)).toBe("1 gift · $1500");
+    const goal = activeGoal(v.campaigns, today, "prodigy")!;
+    expect(goal.title).toBe("Giving Tuesday push");
+    const gift = { ...v.ledger.find((e) => e.id === "e1")!, id: "g2", date: "2026-12-05", amount: 250, counterparty: "Lee" };
+    expect(campaignRaised(goal, [...v.ledger, gift])).toMatchObject({ amount: 250, donors: 1, source: "dates" });
+    expect(campaignStats(v.campaigns, v.ledger, today)).toMatchObject({ asksSent: 25, responded: 10, raised: 1900 });
   });
 });

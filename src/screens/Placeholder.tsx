@@ -3,8 +3,6 @@ import { Header, NAV } from "../components/Shell";
 
 const PLANS: Partial<Record<Screen, string[]>> = {
 
-  campaigns: ["Marketing and fundraising board (Ideas · Drafting · Scheduled · Done).", "Crowdfunding goal tracker fed by the ledger."],
-  templates: ["Ask letters, calls to action and thank-yous with [Fill-in] fields.", "Needs fiscal sponsor review badges."],
   reports: ["Fiscal sponsor and funder reports with live preview and PDF export.", "House reports, venue settlement and daily reports."],
 };
 

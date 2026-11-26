@@ -7,6 +7,8 @@ import type { VaultFS } from "./lib/fs";
 import { removeWithFees, upsertWithFees } from "./lib/ledger";
 import { ledgerEntryForPayment } from "./lib/payments";
 import { newDocPath, paymentsForSchedule } from "./lib/paperwork";
+import type { Campaign } from "./lib/types";
+import { newCampaignPath } from "./lib/campaigns";
 import type { Checkout, Conflict, InventoryItem, Scene, ScheduleEvent, ShoppingItem, TimelineTask, TimelineTemplate } from "./lib/types";
 import { producerPurchaseEntry, reimbursementPayment } from "./lib/shopping";
 import { itemFromShopping } from "./lib/inventory";
@@ -91,6 +93,9 @@ interface State {
   deleteInventoryItem: (id: string) => Promise<void>;
   checkOut: (item: string, person: string, due: string, condition: string) => Promise<void>;
   checkIn: (checkout: string, condition: string) => Promise<void>;
+  saveCampaign: (c: Campaign) => Promise<Campaign>;
+  deleteCampaign: (path: string) => Promise<void>;
+  deleteTemplate: (slug: string) => Promise<void>;
   reload: (quiet?: boolean) => Promise<void>;
 }
 
@@ -403,6 +408,25 @@ export const useStore = create<State>()((set, get) => {
     checkIn: async (id, condition) => {
       patch((d) => ({ checkouts: d.checkouts.map((c) => (c.id === id ? { ...c, in_date: todayISO(), condition_in: condition } : c)) }));
       await vault.saveCheckouts(get().fs, get().data.checkouts).catch(fail);
+    },
+
+    saveCampaign: async (c) => {
+      const camp = c.path ? c : { ...c, path: newCampaignPath(c, get().data.campaigns.map((x) => x.path)) };
+      patch((d) => ({ campaigns: upsert(d.campaigns, camp, (x) => x.path) }));
+      await vault.saveCampaign(get().fs, camp).catch(fail);
+      return camp;
+    },
+    deleteCampaign: async (path) => {
+      const c = get().data.campaigns.find((x) => x.path === path);
+      await get().fs.trash(path).catch(fail);
+      patch((d) => ({ campaigns: d.campaigns.filter((x) => x.path !== path) }));
+      if (c) get().toast(`"${c.title}" moved to the trash`);
+    },
+    deleteTemplate: async (slug) => {
+      const t = get().data.templates.find((x) => x.slug === slug);
+      await get().fs.trash(`templates/${slug}.md`).catch(fail);
+      patch((d) => ({ templates: d.templates.filter((x) => x.slug !== slug) }));
+      if (t) get().toast(`"${t.title}" moved to the trash`, () => void get().saveTemplate(t));
     },
 
     reload: async (quiet) => {

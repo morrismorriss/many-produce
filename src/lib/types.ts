@@ -384,6 +384,32 @@ export interface Checkout {
   notes: string;
 }
 
+// ---- Campaigns ----
+
+export const CAMPAIGN_STATUSES = ["Ideas", "Drafting", "Scheduled", "Done"] as const;
+export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
+export const CHANNELS = ["Email", "Newsletter", "Instagram", "Facebook", "TikTok", "Print", "Event", "Phone", "In person", "Crowdfunding page", "Other"];
+
+export interface Campaign {
+  path: string; // campaigns/<date>-<slug>.md
+  title: string;
+  type: "Fundraising" | "Marketing";
+  project: string;
+  channel: string;
+  status: CampaignStatus;
+  date: string;
+  end_date: string; // for crowdfunding pushes with an end
+  template: string; // template slug
+  goal: number | null;
+  asks_sent: number | null;
+  responses: number | null;
+  result_amount: number | null; // typed in, or filled from linked entries
+  result_notes: string; // e.g. "31 presale tickets"
+  linked_entries: string[]; // ledger ids
+  body: string;
+  extra?: Record<string, unknown>;
+}
+
 export interface VaultData {
   projects: Project[];
   ledger: LedgerEntry[];
@@ -404,4 +430,5 @@ export interface VaultData {
   shopping: Record<string, ShoppingItem[]>; // by project
   inventory: InventoryItem[];
   checkouts: Checkout[];
+  campaigns: Campaign[];
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { MoneySource, Settings as S, Sponsor, ThemeName } from "../lib/types";
+import type { MoneySource, Settings as S, Sponsor } from "../lib/types";
 import { slugify } from "../lib/util";
 import { useApp } from "../store";
 import { EditCell, Field } from "../components/bits";
@@ -9,6 +9,7 @@ import { strToU8, zipSync } from "fflate";
 import { collectVault, exportAllCSV } from "../lib/backup";
 import { saveBinaryFile } from "../components/bits";
 import { TodoistSettings } from "./TodoistSettings";
+import { ThemePicker } from "./ThemePicker";
 
 export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
   const { data, saveSettings, saveSponsor, fs, reload, projectBySlug, project, money, toast } = useApp();
@@ -57,22 +58,14 @@ export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
 
         <section className="card">
           <div className="card-head"><h2>Look</h2></div>
-          <div className="form-grid">
-            <Field label="Theme">
-              <select value={s.theme} onChange={(e) => save({ theme: e.target.value as ThemeName })}>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-                <option value="pink">Pink</option>
-                <option value="system">Follow system</option>
-              </select>
-            </Field>
+          <ThemePicker />
+          <div className="form-grid" style={{ marginTop: 12 }}>
             <Field label="Currency">
               <select value={s.currency} onChange={(e) => save({ currency: e.target.value })}>
                 {["USD", "CAD", "GBP", "EUR", "AUD", "NZD"].map((c) => <option key={c}>{c}</option>)}
               </select>
             </Field>
           </div>
-          <p className="small muted" style={{ marginTop: 8 }}>The theme builder (custom colors, fonts, contrast check, shared themes with Many Write and Many Apply) comes in a later build.</p>
         </section>
 
         <section className="card">

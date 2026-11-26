@@ -23,6 +23,7 @@ import { allocValid, formatAlloc, parseAlloc, shareOf, slugify, weekStart } from
 import { loadVault, personToMd } from "../src/lib/vault";
 import { activeGoal, campaignFromMd, campaignRaised, campaignStats, campaignToMd, newCampaignPath, resultLine } from "../src/lib/campaigns";
 import { MemoryFS } from "../src/lib/fs";
+import { BUILTIN_THEMES, checkTheme, contrast, fixAll, mix, nearestPassing, themeFromJSON, themeToJSON, themeVars } from "../src/lib/themes";
 import { EMPTY_STATE, runSync, wantedTasks } from "../src/lib/todoist";
 import { collectVault, exportAllCSV, guessMapping, ledgerFromRows } from "../src/lib/backup";
 import { addDay, boardWarnings, castNumbers, dayOutOfDays, dayPages, moveStrip, parseFdx, parseScreenplayText, shootDayEvents, sortUnscheduled, stripsFromCSV, stripsToCSV } from "../src/lib/stripboard";
@@ -735,5 +736,56 @@ describe("backup and import", () => {
     expect(again.skipped).toBe(2);
     const split = ledgerFromRows([{ Date: "2026-11-22", Memo: "x", Debit: "10", Credit: "" }], guessMapping(["Date", "Memo", "Debit", "Credit"]), "prodigy", "Card", []);
     expect(split.entries[0]).toMatchObject({ kind: "expense", amount: 10 });
+  });
+});
+
+describe("themes", () => {
+  it("measures contrast like WCAG", () => {
+    expect(contrast("#000000", "#ffffff")).toBe(21);
+    expect(contrast("#777777", "#ffffff")).toBeCloseTo(4.48, 1);
+    expect(mix("#000000", "#ffffff", 0.5)).toBe("#808080");
+  });
+  it("suggests the nearest shade that passes", () => {
+    const fixed = nearestPassing("#f7a8c4", "#ffffff", 4.5);
+    expect(contrast(fixed, "#ffffff")).toBeGreaterThanOrEqual(4.5);
+    expect(fixed).not.toBe("#f7a8c4");
+    const light = nearestPassing("#3a3a5a", "#101014", 4.5);
+    expect(contrast(light, "#101014")).toBeGreaterThanOrEqual(4.5);
+  });
+  it("built-in themes pass every check", () => {
+    for (const t of BUILTIN_THEMES) {
+      const failing = checkTheme(t).filter((c) => !c.pass);
+      expect([t.name, failing.map((f) => `${f.label} ${f.ratio}`)]).toEqual([t.name, []]);
+    }
+  });
+  it("flags a hard-to-read theme and every fix passes", () => {
+    const bad = { ...BUILTIN_THEMES[0], colors: { ...BUILTIN_THEMES[0].colors, muted: "#c8c8c8", primary: "#ffb3d1" }, tags: ["#222222"] };
+    const failing = checkTheme(bad).filter((c) => !c.pass);
+    expect(failing.map((f) => f.label)).toEqual(expect.arrayContaining(["Muted text on background", "Primary accent as text"]));
+    // A pale accent gets dark button text instead of white, so its buttons stay readable.
+    expect(checkTheme(bad).find((c) => c.label === "Text on primary buttons")).toMatchObject({ fg: "#16141b", pass: true });
+    for (const f of failing) {
+      const key = f.fix!.key;
+      const fixed = key.startsWith("tag") ? { ...bad, tags: bad.tags.map((c, i) => (i === Number(key.slice(3)) ? f.fix!.value : c)) } : { ...bad, colors: { ...bad.colors, [key]: f.fix!.value } };
+      expect(checkTheme(fixed).find((c) => c.label === f.label)!.pass).toBe(true);
+    }
+  });
+  it("Fix all leaves nothing failing", () => {
+    const awful = { ...BUILTIN_THEMES[0], colors: { ...BUILTIN_THEMES[0].colors, bg: "#f3f7f2", primary: "#8fd19e", secondary: "#a0d0ff", muted: "#b4c2b4", warning: "#ffd76a" }, tags: ["#111111", "#eeeeee"] };
+    expect(checkTheme(awful).some((c) => !c.pass)).toBe(true);
+    expect(checkTheme(fixAll(awful)).filter((c) => !c.pass)).toEqual([]);
+  });
+  it("reads and writes theme files, filling gaps safely", () => {
+    const t = { ...BUILTIN_THEMES[1], id: "midnight", name: "Midnight" };
+    expect(themeFromJSON(themeToJSON(t))).toEqual(t); // extra Many Write keys don't leak back in
+    const partial = themeFromJSON(JSON.stringify({ name: "Half", colors: { bg: "#101010", primary: "nope" }, size: 99 }));
+    expect(partial).toMatchObject({ id: "half", dark: true, size: 20, colors: { bg: "#101010", primary: BUILTIN_THEMES[1].colors.primary } });
+    // A Many Write theme file (four colours) opens here, and our files keep Many Write's names.
+    const mw = themeFromJSON(JSON.stringify({ name: "Sea", colors: { background: "#f4f9fb", sidebar: "#e6f1f5", text: "#203038", accent: "#1f6f8b" }, writingFont: "serif" }), "custom-sea");
+    expect(mw.colors).toMatchObject({ bg: "#f4f9fb", surface: "#e6f1f5", text: "#203038", primary: "#1f6f8b" });
+    expect(contrast(mw.colors.muted, mw.colors.bg)).toBeGreaterThanOrEqual(4.5);
+    expect(JSON.parse(themeToJSON(mw)).colors).toMatchObject({ background: "#f4f9fb", sidebar: "#e6f1f5", accent: "#1f6f8b" });
+    expect(() => themeFromJSON('{"hello":1}')).toThrow("isn't a theme");
+    expect(themeVars(t)["--font-head"]).toContain("Space Grotesk");
   });
 });

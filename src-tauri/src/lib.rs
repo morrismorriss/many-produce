@@ -112,6 +112,86 @@ fn vault_open_file(state: tauri::State<VaultState>, path: String) -> Result<(), 
     tauri_plugin_opener::open_path(p, None::<&str>).map_err(|e| e.to_string())
 }
 
+// ---- Shared themes ----
+// Themes live outside any vault, in a folder Many Write, Many Apply and
+// Many Produce all read, so a theme made in one shows up in the others:
+//   macOS   ~/Library/Application Support/Many Apps/themes
+//   Windows %APPDATA%\Many Apps\themes
+//   Linux   ~/.local/share/Many Apps/themes
+
+fn themes_dir_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    use tauri::Manager;
+    let d = app.path().data_dir().map_err(|e| e.to_string())?.join("Many Apps").join("themes");
+    fs::create_dir_all(&d).map_err(|e| e.to_string())?;
+    Ok(d)
+}
+
+fn theme_file(name: &str) -> Result<String, String> {
+    let ok = !name.is_empty() && name.len() <= 60 && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
+    if ok { Ok(format!("{name}.json")) } else { Err(format!("Bad theme name: {name}")) }
+}
+
+#[tauri::command]
+fn themes_dir(app: tauri::AppHandle) -> Result<String, String> {
+    Ok(themes_dir_path(&app)?.to_string_lossy().to_string())
+}
+
+/// Many Write keeps its own themes in its config folder; Many Produce reads
+/// them too, and saves a copy there so Many Write sees Many Produce's themes.
+fn many_write_themes(app: &tauri::AppHandle) -> Option<PathBuf> {
+    use tauri::Manager;
+    let d = app.path().config_dir().ok()?.join("app.manywrite.desktop").join("themes");
+    if d.parent().map(|p| p.exists()).unwrap_or(false) { Some(d) } else { None }
+}
+
+fn read_json_dir(d: &Path, source: &str, out: &mut Vec<(String, String, String)>) {
+    let Ok(rd) = fs::read_dir(d) else { return };
+    for e in rd.flatten() {
+        let p = e.path();
+        if p.extension().and_then(|x| x.to_str()) != Some("json") {
+            continue;
+        }
+        if let (Some(stem), Ok(text)) = (p.file_stem().and_then(|x| x.to_str()), fs::read_to_string(&p)) {
+            out.push((stem.to_string(), text, source.to_string()));
+        }
+    }
+}
+
+/// (id, json, source) where source is "shared" or "many-write".
+#[tauri::command]
+fn themes_list(app: tauri::AppHandle) -> Result<Vec<(String, String, String)>, String> {
+    let mut out = vec![];
+    read_json_dir(&themes_dir_path(&app)?, "shared", &mut out);
+    if let Some(mw) = many_write_themes(&app) {
+        read_json_dir(&mw, "many-write", &mut out);
+    }
+    out.sort();
+    Ok(out)
+}
+
+#[tauri::command]
+fn theme_save(app: tauri::AppHandle, name: String, contents: String) -> Result<(), String> {
+    fs::write(themes_dir_path(&app)?.join(theme_file(&name)?), &contents).map_err(|e| e.to_string())?;
+    if let Some(mw) = many_write_themes(&app) {
+        // Many Write lists files named custom-<id>.json; the file is a superset of its format.
+        let _ = fs::create_dir_all(&mw);
+        let _ = fs::write(mw.join(format!("custom-{}", theme_file(&name)?)), &contents);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn theme_delete(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    let p = themes_dir_path(&app)?.join(theme_file(&name)?);
+    if p.exists() {
+        fs::remove_file(p).map_err(|e| e.to_string())?;
+    }
+    if let Some(mw) = many_write_themes(&app) {
+        let _ = fs::remove_file(mw.join(format!("custom-{}", theme_file(&name)?)));
+    }
+    Ok(())
+}
+
 // ---- Todoist (optional) ----
 // The personal API token lives in the OS keychain, never in the vault, and
 // every request is made from here so the token never reaches the web view.
@@ -296,6 +376,10 @@ pub fn run() {
             vault_read_base64,
             export_file_base64,
             vault_open_file,
+            themes_dir,
+            themes_list,
+            theme_save,
+            theme_delete,
             todoist_set_token,
             todoist_has_token,
             todoist_clear_token,

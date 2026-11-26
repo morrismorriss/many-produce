@@ -168,11 +168,14 @@ export interface MoneySource {
   sponsor?: string; // sponsor slug, for sponsor funds
 }
 
-export type ThemeName = "light" | "dark" | "pink" | "system";
+/** A built-in theme, "system" (follow light/dark), or "custom:<id>" for a theme from the shared folder. */
+export type ThemeName = "light" | "dark" | "pink" | "system" | `custom:${string}`;
 
 export interface Settings {
   currency: string;
   theme: ThemeName;
+  /** A copy of the active custom theme, so the vault still looks right on a computer without it. */
+  custom_theme?: import("./themes").Theme;
   cushion: number;
   money_sources: MoneySource[];
   expense_categories: string[];

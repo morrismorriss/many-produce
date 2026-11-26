@@ -343,6 +343,25 @@ id,item,type,scenes,owner,contact,scope,territory,term,fee,status,requested,clea
 
 `projects` (project slug → Todoist project id), `sections` ("slug|Section" → section id) and `tasks` (item key such as `payment:p3` or `timeline:prodigy:t12` → `{ id, hash, project }`). The mapping lives here rather than in each item's file, so nothing else changes when sync is turned on or off. The token itself is in the OS keychain (service "Many Produce"), never in the vault.
 
+## Themes (outside the vault)
+
+Custom themes are JSON files in a folder shared by the Many apps:
+
+- macOS: `~/Library/Application Support/Many Apps/themes/`
+- Windows: `%APPDATA%\Many Apps\themes\`
+- Linux: `~/.local/share/Many Apps/themes/`
+
+```json
+{ "format": "many-theme", "version": 1, "id": "forest", "name": "Forest", "dark": false,
+  "colors": { "bg": "#f3f7f2", "surface": "#fbf7f8", "text": "#22202a", "muted": "#5f745f", "primary": "#2f7a44",
+              "secondary": "#2e7cb4", "success": "#2e7d4f", "warning": "#9a6200", "danger": "#c2392f",
+              "background": "#f3f7f2", "sidebar": "#fbf7f8", "accent": "#2f7a44" },
+  "tags": ["#EE8AAE", "#6FB3E0"], "fonts": { "heading": "Fraunces", "body": "Inter" },
+  "size": 14, "density": "comfortable", "radius": 10, "writingFont": "sans", "previewMatchesTheme": false }
+```
+
+`background`, `sidebar`, `accent` and `writingFont` are Many Write's names for the same things, so Many Write can open the file. Saving a theme also writes a copy to Many Write's themes folder (`app.manywrite.desktop/themes/custom-<id>.json` in the system config folder), and Many Produce lists Many Write's own themes too. A four-colour Many Write or Many Apply theme opens here with the other colours filled in. The active theme is also copied into `settings.json` as `custom_theme`, so the vault looks right on a computer that doesn't have the file.
+
 ## .manyproduce/settings.json
 
 This file holds the currency, theme, low-balance `cushion`, `money_sources` (each with `name`, `opening_balance`, `opening_date`, and an optional `sponsor` slug for sponsor funds), the category and tag lists, the last selected project, the forecast length, `producer_name` and `company_name` (used in templates), `threshold_1099` (the 1099 reporting threshold, which you can change because IRS rules change) `doc_types` (your own document types) `max_hours_week` (the weekly hours-called warning; 0 = off) and `todoist` (`enabled`, `parent_project_id`, the per-kind `sync` toggles, `last_sync`, `last_error`).

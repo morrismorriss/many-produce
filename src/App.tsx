@@ -20,6 +20,7 @@ import { CommandPalette, Sidebar, Toasts, sectionOf } from "./components/Shell";
 import { isTauri, MemoryFS, openDesktopVault, type VaultFS } from "./lib/fs";
 import { sampleVault } from "./lib/seed";
 import { loadVault } from "./lib/vault";
+import { BUILTIN_THEMES, themeVars } from "./lib/themes";
 
 const LAST_VAULT = "many-produce:last-vault";
 
@@ -112,17 +113,27 @@ function Welcome({ onOpen, error }: { onOpen: (fs: VaultFS) => void; error: stri
 function useTheme() {
   const { data } = useApp();
   const t = data.settings.theme;
+  const custom = data.settings.custom_theme;
   useEffect(() => {
+    const root = document.documentElement;
+    const clear = () => { for (const k of Object.keys(themeVars(BUILTIN_THEMES[0]))) root.style.removeProperty(k); delete root.dataset.density; };
     const apply = () => {
+      clear();
+      if (t.startsWith("custom:") && custom) {
+        root.dataset.theme = "custom";
+        root.dataset.density = custom.density;
+        for (const [k, v] of Object.entries(themeVars(custom))) root.style.setProperty(k, v);
+        return;
+      }
       const dark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-      document.documentElement.dataset.theme = t === "system" ? (dark ? "dark" : "light") : t;
+      root.dataset.theme = t === "system" ? (dark ? "dark" : "light") : t.startsWith("custom:") ? "light" : t;
     };
     apply();
     if (t !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
-  }, [t]);
+  }, [t, custom]);
 }
 
 function Frame({ onSwitchVault }: { onSwitchVault: () => void }) {

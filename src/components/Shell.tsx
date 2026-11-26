@@ -5,6 +5,7 @@ import type { Project } from "../lib/types";
 import { fmtDate, uniqueSlug } from "../lib/util";
 import { anchorsFor, shiftPreview } from "../lib/timeline";
 import { gearWarnings } from "../lib/inventory";
+import { BUILTIN_THEMES } from "../lib/themes";
 import { useApp, type Screen } from "../store";
 import { Field, Modal, Plus } from "./bits";
 
@@ -130,7 +131,11 @@ function useSidebarData() {
   return { ...a, people };
 }
 
-const COLORS = ["#EE8AAE", "#6FB3E0", "#F4A6A0", "#9B8AE0", "#6CC4A1", "#E8B04A", "#9AA3B2"];
+/** New projects take their colors from the theme's project tag palette. */
+function tagPalette(theme: string, custom?: import("../lib/themes").Theme): string[] {
+  if (theme.startsWith("custom:") && custom) return custom.tags;
+  return (BUILTIN_THEMES.find((t) => t.id === theme) ?? BUILTIN_THEMES[0]).tags;
+}
 
 export function ProjectModal({ onClose, existing }: { onClose: () => void; existing?: Project }) {
   const { data, saveProject, setProject, deleteProject } = useApp();
@@ -138,7 +143,7 @@ export function ProjectModal({ onClose, existing }: { onClose: () => void; exist
     existing ?? {
       slug: "",
       name: "",
-      color: COLORS[data.projects.length % COLORS.length],
+      color: (() => { const pal = tagPalette(data.settings.theme, data.settings.custom_theme); return pal[data.projects.length % pal.length]; })(),
       subtitle: "",
       status: "planning",
       type: "Theater",
@@ -170,7 +175,12 @@ export function ProjectModal({ onClose, existing }: { onClose: () => void; exist
           <input placeholder="Summer 2027 · Chicago" value={p.subtitle} onChange={(e) => set("subtitle", e.target.value)} />
         </Field>
         <Field label="Color">
-          <input type="color" value={p.color} onChange={(e) => set("color", e.target.value)} />
+          <span style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+            <input type="color" value={p.color} onChange={(e) => set("color", e.target.value)} />
+            {tagPalette(data.settings.theme, data.settings.custom_theme).map((c) => (
+              <button key={c} type="button" className="tb-swatch" style={{ background: c, width: 20, height: 20, cursor: "pointer", outline: p.color.toLowerCase() === c.toLowerCase() ? "2px solid var(--text)" : undefined }} aria-label={`Use ${c}`} onClick={() => set("color", c)} />
+            ))}
+          </span>
         </Field>
         <Field label="Type">
           <select value={p.type} onChange={(e) => set("type", e.target.value as Project["type"])}>

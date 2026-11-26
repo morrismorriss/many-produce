@@ -155,8 +155,8 @@ export function Dashboard() {
             </ResponsiveContainer>
           </div>
           <div className="chips small muted" style={{ marginTop: 6 }}>
-            <span><span className="tag" style={{ background: "var(--secondary)", color: "#fff" }}>Money in</span></span>
-            <span><span className="tag" style={{ background: "var(--primary)", color: "#fff" }}>Money out</span></span>
+            <span><span className="tag" style={{ background: "var(--secondary)", color: "var(--on-secondary)" }}>Money in</span></span>
+            <span><span className="tag" style={{ background: "var(--primary)", color: "var(--on-primary)" }}>Money out</span></span>
             <span><span className="tag">— Balance (red dot = low point)</span></span>
           </div>
 

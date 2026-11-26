@@ -42,7 +42,7 @@ export function sampleVault(today = todayISO()): Record<string, string> {
     {
       slug: "prodigy",
       name: "Prodigy",
-      color: "#EE8AAE",
+      color: "#C9697A",
       subtitle: "Summer 2027 · Chicago",
       status: "planning",
       type: "Theater",
@@ -57,7 +57,7 @@ export function sampleVault(today = todayISO()): Record<string, string> {
     {
       slug: "made-men-reading",
       name: "Made Men reading",
-      color: "#6FB3E0",
+      color: "#6F93B0",
       subtitle: "Staged reading · Feb 2027",
       status: "in production",
       type: "Theater",
@@ -73,7 +73,7 @@ export function sampleVault(today = todayISO()): Record<string, string> {
     {
       slug: "night-shift",
       name: "Night Shift",
-      color: "#9B8AE0",
+      color: "#9C8BB8",
       subtitle: "Short film · shoots Jan 2027",
       status: "planning",
       type: "Film",

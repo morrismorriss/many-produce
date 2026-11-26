@@ -84,7 +84,7 @@ export function Sidebar() {
       <div className="switcher" role="group" aria-label="Project">
         <div className="switcher-label">Project</div>
         <button className="proj-btn" aria-pressed={project === ""} onClick={() => setProject("")}>
-          <span className="dot" style={{ background: "conic-gradient(#EE8AAE 0 33%, #6FB3E0 0 66%, #F4A6A0 0)" }} aria-hidden />
+          <span className="dot" style={{ background: "conic-gradient(#C9697A 0 33%, #6F93B0 0 66%, #7FA68B 0)" }} aria-hidden />
           <span>
             <span className="t">All projects</span>
           </span>

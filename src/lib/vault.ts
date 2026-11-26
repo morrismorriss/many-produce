@@ -61,7 +61,7 @@ export const PRESET_SPONSORS: Sponsor[] = [
 export const OVERHEAD_PROJECT: Project = {
   slug: OVERHEAD_SLUG,
   name: "Company overhead",
-  color: "#9AA3B2",
+  color: "#A39A92",
   subtitle: "Shared costs",
   status: "in production",
   type: "Other",
@@ -106,7 +106,7 @@ function projectFromDoc(slug: string, d: Record<string, unknown>, body: string):
   return {
     slug: str(d.slug) || slug,
     name: str(d.name) || slug,
-    color: str(d.color) || "#EE8AAE",
+    color: str(d.color) || "#C9697A",
     subtitle: str(d.subtitle),
     status: (["planning", "in production", "closed"].includes(str(d.status)) ? str(d.status) : "planning") as Project["status"],
     type: (["Theater", "Film", "Other"].includes(str(d.type)) ? str(d.type) : "Theater") as Project["type"],

@@ -786,6 +786,6 @@ describe("themes", () => {
     expect(contrast(mw.colors.muted, mw.colors.bg)).toBeGreaterThanOrEqual(4.5);
     expect(JSON.parse(themeToJSON(mw)).colors).toMatchObject({ background: "#f4f9fb", sidebar: "#e6f1f5", accent: "#1f6f8b" });
     expect(() => themeFromJSON('{"hello":1}')).toThrow("isn't a theme");
-    expect(themeVars(t)["--font-head"]).toContain("Space Grotesk");
+    expect(themeVars(t)["--font-head"]).toContain("EB Garamond");
   });
 });

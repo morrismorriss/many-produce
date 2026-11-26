@@ -1,4 +1,12 @@
 /* Many Produce — shared family look (Light / Dark / Pink themes). */
+@import "@fontsource/hauora-sans/400.css";
+@import "@fontsource/hauora-sans/500.css";
+@import "@fontsource/hauora-sans/600.css";
+@import "@fontsource/hauora-sans/700.css";
+@import "@fontsource/eb-garamond/400.css";
+@import "@fontsource/eb-garamond/400-italic.css";
+@import "@fontsource/eb-garamond/500.css";
+@import "@fontsource/eb-garamond/600.css";
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/500.css";
 @import "@fontsource/inter/600.css";
@@ -13,79 +21,82 @@
 @import "@fontsource/source-serif-4/700.css";
 @import "@fontsource/fraunces/600.css";
 
+/* Matches Many Apply: EB Garamond headings, Hauora Sans text, burgundy accent,
+   warm grays, 10px corners. Semantic colors are nudged where needed so every
+   text pairing reaches 4.5:1. */
 :root,
 [data-theme="light"] {
-  --bg: #ffffff;
-  --surface: #fbf7f8;
-  --surface-2: #f4eef0;
-  --border: #ece3e6;
-  --text: #22202a;
-  --muted: #6b6574;
-  --primary: #d33871; /* pink, darkened to 4.5:1 on white */
+  --bg: #fcfcfc;
+  --surface: #f5f3f1;
+  --surface-2: #ebe9e7;
+  --border: #e8e4de;
+  --text: #2f2b28;
+  --muted: #756c66;
+  --primary: #8a1c2b; /* burgundy */
   --on-primary: #ffffff;
+  --primary-soft: #f4e3e5;
+  --secondary: #3d6b8c; /* slate blue, for money in and links */
   --on-secondary: #ffffff;
-  --primary-soft: #fde4ee;
-  --secondary: #2e7cb4; /* light blue family, 4.5:1 on white */
-  --secondary-soft: #e3f1fb;
-  --danger: #c2392f;
-  --danger-soft: #fde6e3;
-  --warning: #9a6200;
-  --warning-soft: #fff1d6;
-  --success: #2e7d4f;
-  --success-soft: #e2f4e9;
-  --focus: #2f7fb8;
-  --shadow: 0 8px 30px rgba(40, 20, 30, 0.1);
+  --secondary-soft: #e3e9ed;
+  --danger: #c0443a;
+  --danger-soft: #f4e4e3;
+  --warning: #94621a;
+  --warning-soft: #eee8df;
+  --success: #387b56;
+  --success-soft: #e3ebe6;
+  --focus: #3d6b8c;
+  --shadow: 0 1px 2px rgba(40, 30, 20, 0.04), 0 4px 16px rgba(40, 30, 20, 0.06);
   --radius: 10px;
-  --font-ui: "Inter", system-ui, sans-serif;
-  --font-head: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-ui: "Hauora Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-head: "EB Garamond", Garamond, Georgia, serif;
   color-scheme: light;
 }
 
 [data-theme="dark"] {
-  --bg: #17161c;
-  --surface: #1f1e26;
-  --surface-2: #2a2933;
-  --border: #34323e;
-  --text: #f1eef5;
-  --muted: #a9a3b5;
-  --primary: #f28bb3;
-  --on-primary: #16141b;
+  --bg: #191817;
+  --surface: #1f1e1d;
+  --surface-2: #2f2e2d;
+  --border: #33312f;
+  --text: #ebe7e2;
+  --muted: #8c867f;
+  --primary: #e07d8c;
+  --on-primary: #1b1514;
+  --primary-soft: #3f2328;
+  --secondary: #8fb8d6;
   --on-secondary: #16141b;
-  --primary-soft: #432536;
-  --secondary: #79bde9;
-  --secondary-soft: #1f3445;
-  --danger: #ff8a80;
-  --danger-soft: #4a2420;
-  --warning: #f2c063;
-  --warning-soft: #43361a;
-  --success: #7fd3a0;
-  --success-soft: #1d3a2a;
-  --focus: #79bde9;
-  --shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  --secondary-soft: #333b41;
+  --danger: #ef8a80;
+  --danger-soft: #48312e;
+  --warning: #e0b25c;
+  --warning-soft: #453a26;
+  --success: #7cc79a;
+  --success-soft: #2f3f34;
+  --focus: #8fb8d6;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
   color-scheme: dark;
 }
 
 [data-theme="pink"] {
-  --bg: #fff5f8;
-  --surface: #ffe9f0;
-  --surface-2: #ffdbe7;
-  --border: #f6c8d7;
-  --text: #3a1d2a;
-  --muted: #7a5465;
-  --primary: #c22f69;
+  --bg: #fff7f9;
+  --surface: #fdeaf0;
+  --surface-2: #f3e0e6;
+  --border: #f5d6e0;
+  --text: #3d2730;
+  --muted: #8b6171;
+  --primary: #c82c67;
   --on-primary: #ffffff;
+  --primary-soft: #f7dbe5;
+  --secondary: #3d6b8c;
   --on-secondary: #ffffff;
-  --primary-soft: #ffd0e0;
-  --secondary: #2c74a8;
-  --secondary-soft: #dcecf8;
-  --danger: #b3261e;
-  --danger-soft: #ffdcd6;
-  --warning: #8a5800;
-  --warning-soft: #ffeccc;
-  --success: #2a7248;
-  --success-soft: #dcf1e4;
-  --focus: #2c74a8;
-  --shadow: 0 8px 30px rgba(120, 30, 70, 0.12);
+  --secondary-soft: #e6e5eb;
+  --danger: #bc4239;
+  --danger-soft: #f6dfe0;
+  --warning: #94621a;
+  --warning-soft: #f1e4dc;
+  --success: #377853;
+  --success-soft: #e5e6e3;
+  --focus: #3d6b8c;
+  --shadow: 0 1px 2px rgba(120, 30, 70, 0.05), 0 4px 16px rgba(120, 30, 70, 0.08);
   color-scheme: light;
 }
 
@@ -97,9 +108,11 @@ body {
   font: var(--fs, 14px)/1.45 var(--font-ui);
   -webkit-font-smoothing: antialiased;
 }
-h1, h2, h3, h4 { font-family: var(--font-head); font-weight: 700; margin: 0; letter-spacing: -0.01em; }
-h1 { font-size: 22px; }
-h2 { font-size: 17px; }
+/* As in Many Apply: serif display headings, sans for smaller ones. */
+h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.005em; font-family: var(--font-ui); }
+h1, h2 { font-family: var(--font-head); font-weight: 500; letter-spacing: 0; }
+h1 { font-size: 28px; line-height: 1.15; }
+h2 { font-size: 20px; line-height: 1.25; }
 h3 { font-size: 14px; }
 a { color: var(--secondary); }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -120,7 +133,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .main { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .content { flex: 1; overflow: auto; padding: 20px 24px 40px; }
 
-.brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 8px; font-family: var(--font-head); font-weight: 700; font-size: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 16px 16px 8px; font-family: var(--font-head); font-weight: 500; font-size: 20px; }
 .brand img { width: 26px; height: 26px; }
 
 .switcher { margin: 6px 10px 10px; display: flex; flex-direction: column; gap: 2px; }
@@ -135,7 +148,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .nav { padding: 4px 10px 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 1px; }
 .nav button { display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left; border: 0; background: transparent; padding: 6px 10px; border-radius: 7px; cursor: pointer; color: var(--text); }
 .nav button:hover { background: var(--surface-2); }
-.nav button[aria-current="page"] { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+.nav button[aria-current="page"] { background: var(--surface-2); color: var(--text); font-weight: 600; }
 .nav .count { font-size: 11px; color: var(--muted); }
 .nav .count.alert { color: var(--danger); font-weight: 600; }
 .nav .later { font-size: 10px; color: var(--muted); border: 1px dashed var(--border); border-radius: 999px; padding: 0 6px; }
@@ -149,7 +162,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .search svg { position: absolute; left: 9px; top: 9px; color: var(--muted); }
 
 /* ---- bits ---- */
-.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); cursor: pointer; font-weight: 500; white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg); cursor: pointer; font-weight: 500; white-space: nowrap; }
 .btn:hover { background: var(--surface); }
 .btn.primary { background: var(--primary); color: var(--on-primary); border-color: transparent; }
 .btn.primary:hover { filter: brightness(1.05); }
@@ -179,7 +192,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
 .tile .label { font-size: 12px; color: var(--muted); }
-.tile .value { font-family: var(--font-head); font-size: 22px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.tile .value { font-family: var(--font-head); font-size: 26px; font-weight: 500; margin-top: 2px; font-variant-numeric: lining-nums tabular-nums; }
 .tile .sub { font-size: 12px; color: var(--muted); }
 .tile.alert .value { color: var(--danger); }
 
@@ -360,7 +373,7 @@ table.shopping select[aria-label="Department"] { min-width: 118px; }
 .column-head { display: flex; justify-content: space-between; align-items: center; padding: 2px 4px; }
 .ccard { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px; cursor: grab; }
 .ccard:hover { box-shadow: var(--shadow); }
-.goal-num { font-family: var(--font-head); font-size: 28px; font-weight: 700; }
+.goal-num { font-family: var(--font-head); font-size: 30px; font-weight: 500; font-variant-numeric: lining-nums; }
 .link-list { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow: auto; padding: 6px; border: 1px solid var(--border); border-radius: 8px; }
 .link-list label { display: flex; gap: 6px; align-items: center; }
 

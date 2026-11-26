@@ -15,7 +15,9 @@
   },
   "dependencies": {
     "@fontsource/atkinson-hyperlegible": "^5.3.0",
+    "@fontsource/eb-garamond": "^5.3.0",
     "@fontsource/fraunces": "^5.3.0",
+    "@fontsource/hauora-sans": "^5.3.0",
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/source-serif-4": "^5.3.1",

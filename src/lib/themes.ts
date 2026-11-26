@@ -2,6 +2,8 @@
 // format shared with Many Write and Many Apply.
 
 export const FONTS = [
+  { id: "Hauora Sans", css: '"Hauora Sans", -apple-system, "Segoe UI", sans-serif', kind: "Sans" },
+  { id: "EB Garamond", css: '"EB Garamond", Garamond, Georgia, serif', kind: "Serif display" },
   { id: "Inter", css: '"Inter", system-ui, sans-serif', kind: "Sans" },
   { id: "Space Grotesk", css: '"Space Grotesk", "Inter", system-ui, sans-serif', kind: "Sans" },
   { id: "IBM Plex Sans", css: '"IBM Plex Sans", "Inter", system-ui, sans-serif', kind: "Sans" },
@@ -33,12 +35,14 @@ export interface Theme {
   radius: number; // corner roundness in px
 }
 
-const base = { format: "many-theme" as const, version: 1 as const, fonts: { heading: "Space Grotesk", body: "Inter" }, size: 14, density: "comfortable" as const, radius: 10 };
+// The built-in themes match Many Apply (Hauora Sans, EB Garamond, burgundy, warm grays, 10px corners).
+const base = { format: "many-theme" as const, version: 1 as const, fonts: { heading: "EB Garamond", body: "Hauora Sans" }, size: 14, density: "comfortable" as const, radius: 10 };
+const WARM_TAGS = ["#C9697A", "#6F93B0", "#7FA68B", "#C9A04F", "#9C8BB8", "#C98363", "#A39A92"];
 
 export const BUILTIN_THEMES: Theme[] = [
-  { ...base, id: "light", name: "Light", dark: false, colors: { bg: "#ffffff", surface: "#fbf7f8", text: "#22202a", muted: "#6b6574", primary: "#d33871", secondary: "#2e7cb4", success: "#2e7d4f", warning: "#9a6200", danger: "#c2392f" }, tags: ["#EE8AAE", "#6FB3E0", "#F4A6A0", "#9B8AE0", "#6CC4A1", "#E8B04A", "#9AA3B2"] },
-  { ...base, id: "dark", name: "Dark", dark: true, colors: { bg: "#17161c", surface: "#1f1e26", text: "#f1eef5", muted: "#a9a3b5", primary: "#f28bb3", secondary: "#79bde9", success: "#7fd3a0", warning: "#f2c063", danger: "#ff8a80" }, tags: ["#F28BB3", "#79BDE9", "#F4A6A0", "#B3A6F0", "#7FD3A0", "#F2C063", "#A9A3B5"] },
-  { ...base, id: "pink", name: "Pink", dark: false, colors: { bg: "#fff5f8", surface: "#ffe9f0", text: "#3a1d2a", muted: "#7a5465", primary: "#c22f69", secondary: "#2c74a8", success: "#2a7248", warning: "#8a5800", danger: "#b3261e" }, tags: ["#EE8AAE", "#6FB3E0", "#F4A6A0", "#9B8AE0", "#6CC4A1", "#E8B04A", "#9AA3B2"] },
+  { ...base, id: "light", name: "Light", dark: false, colors: { bg: "#fcfcfc", surface: "#f5f3f1", text: "#2f2b28", muted: "#756c66", primary: "#8a1c2b", secondary: "#3d6b8c", success: "#387b56", warning: "#94621a", danger: "#c0443a" }, tags: WARM_TAGS },
+  { ...base, id: "dark", name: "Dark", dark: true, colors: { bg: "#191817", surface: "#1f1e1d", text: "#ebe7e2", muted: "#8c867f", primary: "#e07d8c", secondary: "#8fb8d6", success: "#7cc79a", warning: "#e0b25c", danger: "#ef8a80" }, tags: ["#E07D8C", "#8FB8D6", "#9CC7A8", "#E0B25C", "#B7A8D6", "#E0A07E", "#B5ADA5"] },
+  { ...base, id: "pink", name: "Pink", dark: false, colors: { bg: "#fff7f9", surface: "#fdeaf0", text: "#3d2730", muted: "#8b6171", primary: "#c82c67", secondary: "#3d6b8c", success: "#377853", warning: "#94621a", danger: "#bc4239" }, tags: ["#D6427A", "#6F93B0", "#7FA68B", "#C9A04F", "#9C8BB8", "#C98363", "#A57F8D"] },
 ];
 
 // ---- color math ----

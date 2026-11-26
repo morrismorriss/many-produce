@@ -94,7 +94,7 @@ Push a `v*` tag to build unsigned Mac, Windows and Linux installers on GitHub Ac
 ## How it's built
 
 - **Tauri 2** desktop shell. The Rust side (`src-tauri/src/lib.rs`) only exposes a few file commands, scoped to the vault folder you picked.
-- **React + TypeScript + Vite** front end. Charts use Recharts. Inter and Space Grotesk fonts are bundled, so everything works offline.
+- **React + TypeScript + Vite** front end. Charts use Recharts. Fonts (Hauora Sans and EB Garamond, as in Many Apply, plus the theme builder's extras) are bundled, so everything works offline.
 - All the money logic is plain TypeScript in `src/lib/`, with unit tests in `tests/`. `docs/FILE-FORMATS.md` describes every file.
 
 ```

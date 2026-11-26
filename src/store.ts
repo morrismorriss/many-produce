@@ -7,7 +7,7 @@ import type { VaultFS } from "./lib/fs";
 import { removeWithFees, upsertWithFees } from "./lib/ledger";
 import { ledgerEntryForPayment } from "./lib/payments";
 import { newDocPath, paymentsForSchedule } from "./lib/paperwork";
-import type { Campaign } from "./lib/types";
+import type { Campaign, DailyReport, HouseReport, SavedReport } from "./lib/types";
 import { newCampaignPath } from "./lib/campaigns";
 import type { Checkout, Conflict, InventoryItem, Scene, ScheduleEvent, ShoppingItem, TimelineTask, TimelineTemplate } from "./lib/types";
 import { producerPurchaseEntry, reimbursementPayment } from "./lib/shopping";
@@ -96,6 +96,11 @@ interface State {
   saveCampaign: (c: Campaign) => Promise<Campaign>;
   deleteCampaign: (path: string) => Promise<void>;
   deleteTemplate: (slug: string) => Promise<void>;
+  saveReport: (r: SavedReport) => Promise<void>;
+  deleteReport: (path: string) => Promise<void>;
+  saveHouseReport: (h: HouseReport) => Promise<void>;
+  saveDailyReport: (r: DailyReport) => Promise<void>;
+  deleteReportFile: (path: string) => Promise<void>;
   reload: (quiet?: boolean) => Promise<void>;
 }
 
@@ -427,6 +432,28 @@ export const useStore = create<State>()((set, get) => {
       await get().fs.trash(`templates/${slug}.md`).catch(fail);
       patch((d) => ({ templates: d.templates.filter((x) => x.slug !== slug) }));
       if (t) get().toast(`"${t.title}" moved to the trash`, () => void get().saveTemplate(t));
+    },
+
+    saveReport: async (r) => {
+      patch((d) => ({ reports: upsert(d.reports, r, (x) => x.path) }));
+      await vault.saveReport(get().fs, r).catch(fail);
+    },
+    deleteReport: async (path) => {
+      await get().fs.trash(path).catch(fail);
+      patch((d) => ({ reports: d.reports.filter((x) => x.path !== path) }));
+    },
+    saveHouseReport: async (h) => {
+      patch((d) => ({ houseReports: upsert(d.houseReports, h, (x) => x.path) }));
+      await vault.saveHouseReport(get().fs, h).catch(fail);
+    },
+    saveDailyReport: async (r) => {
+      patch((d) => ({ dailyReports: upsert(d.dailyReports, r, (x) => x.path) }));
+      await vault.saveDailyReport(get().fs, r, get().data.people).catch(fail);
+    },
+    deleteReportFile: async (path) => {
+      await get().fs.trash(path).catch(fail);
+      patch((d) => ({ houseReports: d.houseReports.filter((x) => x.path !== path), dailyReports: d.dailyReports.filter((x) => x.path !== path) }));
+      get().toast("Report moved to the trash");
     },
 
     reload: async (quiet) => {

@@ -23,6 +23,10 @@ import { allocValid, formatAlloc, parseAlloc, shareOf, slugify, weekStart } from
 import { loadVault, personToMd } from "../src/lib/vault";
 import { activeGoal, campaignFromMd, campaignRaised, campaignStats, campaignToMd, newCampaignPath, resultLine } from "../src/lib/campaigns";
 import { MemoryFS } from "../src/lib/fs";
+import {
+  computeReport, dailyCalc, dailyFromMd, dailyFromSchedule, dailyText, dailyToMd, dealFrom, defaultReportSettings, eighths, houseCalc,
+  missingHouseReports, reportCSV, reportHtml, reportMarkdown, runSummary, savedReportFromMd, savedReportToMd, settle, ticketsFromRows,
+} from "../src/lib/reports";
 import { sampleVault } from "../src/lib/seed";
 
 const sponsors: Sponsor[] = [
@@ -499,5 +503,66 @@ describe("campaigns", () => {
     const gift = { ...v.ledger.find((e) => e.id === "e1")!, id: "g2", date: "2026-12-05", amount: 250, counterparty: "Lee" };
     expect(campaignRaised(goal, [...v.ledger, gift])).toMatchObject({ amount: 250, donors: 1, source: "dates" });
     expect(campaignStats(v.campaigns, v.ledger, today)).toMatchObject({ asksSent: 25, responded: 10, raised: 1900 });
+  });
+});
+
+describe("reports", () => {
+  const today = "2026-11-26";
+  it("builds a sponsor report with restricted funds and fees", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const s = defaultReportSettings("made-men-reading", "producer-hub", "2026-01-01", today);
+    const r = computeReport(s, v);
+    expect(r.title).toBe("Producer Hub report");
+    expect(r.sponsorLine).toBe("Fiscally sponsored project of Producer Hub");
+    expect(r.received).toBe(400);
+    expect(r.spent).toBe(88); // 40% of $200 ads + $8 fee
+    expect(r.sponsorFees).toBe(8);
+    expect(r.restricted).toEqual([{ restriction: "Reading stipends", received: 400, spent: 0, left: 400 }]);
+    const html = reportHtml(r, s, "Went well.", "Morgan", (n) => "$" + n, "<p>Went well.</p>");
+    expect(html).toContain("Fiscally sponsored project of Producer Hub");
+    expect(reportMarkdown(r, s, "Went well.", (n) => "$" + n)).toContain("## Restricted funds");
+    expect(reportCSV(r).split("\n")[0]).toBe("section,label,detail,amount");
+    const saved = { path: "reports/x.md", title: "Q4", template: false, settings: s, sent: today, snapshot: { received: 400 }, notes: "Went well." };
+    expect(savedReportFromMd("reports/x.md", savedReportToMd(saved))).toEqual(saved);
+  });
+
+  it("totals a house report and a run", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const h = v.houseReports[0];
+    const c = houseCalc(h);
+    expect(c).toMatchObject({ sold: 56, comps: 2, attendance: 55, gross: 1208, net: 1146.5, pctCapacity: 69 });
+    const run = runSummary([h, { ...h, date: "2026-11-20", tickets: [{ type: "Full", sold: 20, price: 25 }], comps: [], no_shows: 0 }]);
+    expect(run).toMatchObject({ nights: 2, attendance: 75, gross: 1708 });
+    expect(run.best?.attendance).toBe(55);
+    expect(missingHouseReports(v.events, v.houseReports, today).map((e) => e.id)).toEqual(["ev8"]);
+    const tickets = ticketsFromRows([{ Type: "Full", Qty: "2", Total: "50" }, { Type: "Student", Qty: "1", Total: "15" }, { Type: "Full", Qty: "1", Total: "25" }], { type: "Type", quantity: "Qty", amount: "Total", amountIsTotal: true });
+    expect(tickets).toEqual([{ type: "Full", sold: 3, price: 25 }, { type: "Student", sold: 1, price: 15 }]);
+  });
+
+  it("settles with a venue: guarantee vs. door split, bar minimum, deposits", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const hop = v.venues.find((x) => x.slug === "hop-hall")!;
+    const h = v.houseReports[0];
+    const s = settle(dealFrom(hop), [h], 100);
+    // 20% of 1208 = 241.60 < 300 guarantee → 300; bar 520 ≥ 400 → no shortfall; cleaning 50.
+    expect(s.lines.map((l) => l.amount)).toEqual([300, 50]);
+    expect(s).toMatchObject({ venueDue: 350, depositsPaid: 100, balance: 250 });
+    const collects = settle({ ...dealFrom(hop), venue_collects_box_office: true }, [h], 0);
+    expect(collects.balance).toBe(-858); // venue holds 1208, is due 350
+    const low = settle(dealFrom(hop), [{ ...h, bar_sales: 300 }], 0);
+    expect(low.lines.find((l) => l.label.startsWith("Bar minimum"))?.amount).toBe(100);
+  });
+
+  it("starts a daily report from the Schedule and works out hours", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const r = v.dailyReports[0];
+    const c = dailyCalc(r);
+    expect(c.hours).toEqual({ "ana-reyes": 3.08, "maya-ostrowski": 2.83 }); // minus the 15-minute meal
+    expect(c.overMinutes).toBe(20);
+    expect(dailyText(r, v.people, "Prodigy", "")).toContain("OVER by 20 min");
+    const fresh = dailyFromSchedule("made-men-reading", "2027-02-01", [{ id: "x", project: "made-men-reading", date: "2027-02-01", start: "18:00", end: "21:00", type: "Rehearsal", title: "", location: "", called: ["leo-grant"], scenes: ["s1"], notes: "" }], () => "1.1", (l) => l);
+    expect(fresh).toMatchObject({ kind: "Rehearsal", planned_end: "21:00", calls: [{ person: "leo-grant", call: "18:00" }], scenes: [{ scene: "1.1", status: "Planned" }] });
+    expect(eighths(11)).toBe("1 3/8");
+    expect(dailyFromMd(r.path, dailyToMd(r, v.people))).toEqual(r);
   });
 });

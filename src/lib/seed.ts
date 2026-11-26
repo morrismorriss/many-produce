@@ -23,6 +23,8 @@ import { shoppingToCSV } from "./shopping";
 import { checkoutsToCSV, itemsToCSV } from "./inventory";
 import type { Campaign, InventoryItem, ShoppingItem } from "./types";
 import { campaignToMd } from "./campaigns";
+import { dailyToMd, houseToMd } from "./reports";
+import type { DailyReport, HouseReport } from "./types";
 import { STARTER_TIMELINE_TEMPLATES, applyTemplate, timelineToMd } from "./timeline";
 import { OVERHEAD_PROJECT, PRESET_SPONSORS, SETTINGS_PATH, personToMd, projectToMd, sponsorToMd, venueToMd } from "./vault";
 
@@ -193,7 +195,8 @@ export function sampleVault(today = todayISO()): Record<string, string> {
   const venues: Venue[] = [
     { slug: "uptown-studio-theatre", name: "Uptown Studio Theatre", type: "black box", city: "Chicago", capacity: 60, rate: "$1,600/week", tech_notes: "12 dimmers, no fly space", status: "Booked", projects: ["prodigy"], next_step: "Send COI", contact: "Lee (house manager)", hold_dates: "", notes: "" },
     { slug: "fulton-gallery", name: "Fulton Gallery", type: "gallery", city: "Chicago", capacity: 45, rate: "$300/night", tech_notes: "Bring a PA", status: "Hold", projects: ["made-men-reading"], next_step: "Confirm date", contact: "", hold_dates: d(75), notes: "" },
-    { slug: "hop-hall", name: "Hop Hall Brewery", type: "brewery", city: "Chicago", capacity: 80, rate: "Bar minimum $800", tech_notes: "", status: "Toured", projects: [], next_step: "Ask about Monday nights", contact: "", hold_dates: "", notes: "" },
+    { slug: "hop-hall", name: "Hop Hall Brewery", type: "brewery", city: "Chicago", capacity: 80, rate: "Bar minimum $800, 20% door vs $300", tech_notes: "", status: "Booked", projects: ["prodigy"], next_step: "Settle the cabaret nights", contact: "", hold_dates: "", notes: "Hosted our two fundraiser cabaret nights.",
+      deal: { basis: "night", flat_rental: 0, door_split: 0.2, guarantee: 300, versus: true, bar_minimum: 400, venue_collects_box_office: false, fees: [{ label: "Cleaning", amount: 50 }] } },
   ];
   for (const v of venues) files[`venues/${v.slug}.md`] = venueToMd(v);
 
@@ -202,6 +205,9 @@ export function sampleVault(today = todayISO()): Record<string, string> {
     ({ id, project, date, start: "18:30", end: "21:30", type, title: "", location: "", called: [], scenes: [], notes: "", ...x });
   files["schedule/prodigy.csv"] = eventsToCSV([
     ev("ev1", "prodigy", d(1), "Design meeting", { title: "Lighting concept", start: "18:00", end: "19:30", called: ["ana-reyes", "jun-park"], location: "Zoom" }),
+    ev("ev7", "prodigy", d(-7), "Performance", { title: "Fundraiser cabaret", start: "19:30", end: "22:00", location: "hop-hall", called: ["ana-reyes", "maya-ostrowski"] }),
+    ev("ev8", "prodigy", d(-6), "Performance", { title: "Fundraiser cabaret", start: "19:30", end: "22:00", location: "hop-hall", called: ["ana-reyes", "maya-ostrowski"] }),
+    ev("ev9", "prodigy", d(-8), "Rehearsal", { title: "Cabaret run-through", start: "18:00", end: "21:00", location: "hop-hall", called: ["ana-reyes", "maya-ostrowski"] }),
     ev("ev2", "prodigy", d(4), "Read-through", { start: "13:00", end: "16:00", called: ["ana-reyes", "maya-ostrowski"], location: "uptown-studio-theatre" }),
   ]);
   const mm = ["leo-grant", "maya-ostrowski", "rosa-diaz", "dev-okafor"];
@@ -280,6 +286,26 @@ export function sampleVault(today = todayISO()): Record<string, string> {
   camp(`campaigns/${d(12)}-cast-announcement.md`, { title: "Cast announcement", type: "Marketing", status: "Drafting", channel: "Instagram", date: d(12), template: "cta-instagram" });
   camp(`campaigns/${d(60)}-reading-invite.md`, { title: "Reading invite", type: "Marketing", project: "made-men-reading", status: "Ideas", channel: "Email", date: d(60) });
   camp(`campaigns/${d(-12)}-reading-sponsor.md`, { title: "Reading sponsor ask", project: "made-men-reading", status: "Done", channel: "In person", date: d(-14), asks_sent: 3, responses: 1, linked_entries: ["e5"] });
+
+  // House and daily reports
+  const hr = (date: string, x: Partial<HouseReport>): HouseReport => ({
+    path: `house-reports/prodigy/${date}.md`, project: "prodigy", date, venue: "hop-hall", call_time: "18:30", start_time: "19:38", capacity: 80,
+    tickets: [], comps: [], walkups: 0, no_shows: 0, attendance: null, gross: null, platform_fees: 0, bar_sales: null, foh_notes: "", incidents: "", venue_notes: "", ...x,
+  });
+  const night1 = hr(d(-7), {
+    tickets: [{ type: "Full", sold: 41, price: 25 }, { type: "Student", sold: 9, price: 15 }, { type: "Pay what you can", sold: 6, price: 8 }],
+    comps: [{ who: "Lee (house manager)", why: "Venue" }, { who: "Press: Chicago Reader", why: "Review" }],
+    walkups: 7, no_shows: 3, platform_fees: 61.5, bar_sales: 520, foh_notes: "Line out the door at 7:15. Start was 8 min late.",
+  });
+  files[night1.path] = houseToMd(night1);
+  // The second cabaret night has no house report yet, so the Dashboard asks for one.
+  const daily: DailyReport = {
+    path: `daily-reports/prodigy/${d(-8)}.md`, project: "prodigy", date: d(-8), kind: "Rehearsal", location: "Hop Hall Brewery", planned_end: "21:00",
+    first_start: "18:10", meal_start: "19:30", meal_end: "19:45", wrap: "21:20",
+    calls: [{ person: "ana-reyes", call: "18:00", in: "18:00", out: "21:20", late: false, absent: false }, { person: "maya-ostrowski", call: "18:00", in: "18:15", out: "21:20", late: true, absent: false }],
+    scenes: [], setups: null, takes: null, used_items: ["it1"], injuries: "", damage: "Mic stand cracked at the base.", dept_notes: { Sound: "Need a second wireless mic." }, tomorrow: "Spike marks for the cabaret stools.", followups_done: false,
+  };
+  files[daily.path] = dailyToMd(daily, people);
 
   // Paperwork
   const doc = (path: string, x: Partial<PaperDoc>) => {

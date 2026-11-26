@@ -114,7 +114,20 @@ export interface Person {
 }
 
 export type VenueStatus = "Contacted" | "Toured" | "Hold" | "Booked" | "Passed";
+/** A venue's deal terms, used by the venue settlement. */
+export interface VenueDeal {
+  basis: "night" | "run"; // are flat amounts per performance or for the whole run?
+  flat_rental: number;
+  door_split: number; // venue's share of box office, 0..1
+  guarantee: number; // with versus: venue gets whichever is higher, guarantee or door split
+  versus: boolean;
+  bar_minimum: number; // producer covers the shortfall if bar sales come in under it
+  venue_collects_box_office: boolean;
+  fees: { label: string; amount: number }[]; // cleaning, tech, …
+}
+
 export interface Venue {
+  deal?: VenueDeal;
   /** Frontmatter keys the app doesn't know about, kept as-is on save. */
   extra?: Record<string, unknown>;
   slug: string;
@@ -410,6 +423,97 @@ export interface Campaign {
   extra?: Record<string, unknown>;
 }
 
+// ---- Reports ----
+
+export const REPORT_SECTIONS = ["income_by_source", "expenses_by_category", "budget_vs_actual", "restricted_funds", "sponsor_fees", "producer_notes", "receipts_appendix"] as const;
+export type ReportSection = (typeof REPORT_SECTIONS)[number];
+
+export interface ReportSettings {
+  report_for: string; // sponsor slug, or "" for another funder
+  funder_name: string;
+  grant_number: string;
+  projects: string[]; // empty = all
+  from: string;
+  to: string;
+  include: ReportSection[];
+}
+
+export interface SavedReport {
+  path: string; // reports/<date>-<slug>.md, or reports/report-templates/<slug>.md
+  title: string;
+  template: boolean;
+  settings: ReportSettings;
+  sent: string; // date it was saved as sent
+  snapshot: Record<string, unknown> | null; // numbers at the time it was sent
+  notes: string; // producer notes (markdown body)
+}
+
+export interface TicketLine {
+  type: string; // full, student, pay-what-you-can…
+  sold: number;
+  price: number; // average price per ticket
+}
+
+export interface HouseReport {
+  path: string; // house-reports/<project>/<date>.md
+  project: string;
+  date: string;
+  venue: string;
+  call_time: string;
+  start_time: string; // actual start
+  capacity: number | null;
+  tickets: TicketLine[];
+  comps: { who: string; why: string }[];
+  walkups: number;
+  no_shows: number;
+  attendance: number | null; // typed in; otherwise sold + comps − no-shows
+  gross: number | null; // typed in; otherwise from tickets
+  platform_fees: number;
+  bar_sales: number | null;
+  foh_notes: string;
+  incidents: string;
+  venue_notes: string;
+}
+
+export interface DailyCall {
+  person: string;
+  call: string; // scheduled call
+  in: string; // actual in
+  out: string;
+  late: boolean;
+  absent: boolean;
+}
+
+export interface DailyScene {
+  scene: string; // number
+  planned_pages: number; // eighths of a page, e.g. 3 = 3/8
+  shot_pages: number;
+  status: "Done" | "Partly done" | "Moved" | "Planned";
+}
+
+export interface DailyReport {
+  path: string; // daily-reports/<project>/<date>.md
+  project: string;
+  date: string;
+  kind: string; // Shoot day, Rehearsal, Tech, Work day
+  location: string;
+  planned_end: string;
+  first_start: string;
+  meal_start: string;
+  meal_end: string;
+  wrap: string;
+  calls: DailyCall[];
+  scenes: DailyScene[];
+  setups: number | null;
+  takes: number | null;
+  used_items: string[]; // Equipment log ids
+  injuries: string;
+  damage: string;
+  dept_notes: Record<string, string>;
+  tomorrow: string;
+  followups_done: boolean;
+}
+
 export interface VaultData {
   projects: Project[];
   ledger: LedgerEntry[];
@@ -431,4 +535,7 @@ export interface VaultData {
   inventory: InventoryItem[];
   checkouts: Checkout[];
   campaigns: Campaign[];
+  reports: SavedReport[];
+  houseReports: HouseReport[];
+  dailyReports: DailyReport[];
 }

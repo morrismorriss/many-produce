@@ -24,7 +24,7 @@ export const NAV: Section[] = [
   { id: "schedule", label: "Schedule" }, // calendar, availability, scenes and the timeline
   { id: "shopping", label: "Supplies", tabs: [{ id: "shopping", label: "Shopping list" }, { id: "inventory", label: "Equipment log" }] },
   { id: "campaigns", label: "Outreach", tabs: [{ id: "campaigns", label: "Campaigns" }, { id: "templates", label: "Templates" }] },
-  { id: "reports", label: "Reports", phase: 8 },
+  { id: "reports", label: "Reports" },
   { id: "settings", label: "Settings" },
 ];
 

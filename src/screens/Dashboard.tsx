@@ -14,6 +14,7 @@ import { missingPaperwork } from "../lib/paperwork";
 import { anchorsFor, resolveDue } from "../lib/timeline";
 import { summarize as shopSummary } from "../lib/shopping";
 import { useGearWarnings } from "./Equipment";
+import { missingDailyReports, missingHouseReports } from "../lib/reports";
 
 export function Dashboard() {
   const app = useApp();
@@ -65,6 +66,8 @@ export function Dashboard() {
     .filter(({ t }) => t.status !== "Done" && t.status !== "Skipped");
   const toReimburse = shopSummary(Object.values(data.shopping).flat().filter((i) => !project || i.project === project), allPayments).toReimburse;
   const gear = useGearWarnings(project);
+  const noHouse = missingHouseReports(data.events, data.houseReports, today, project);
+  const noDaily = missingDailyReports(data.events, data.dailyReports, today, project);
   const overdueTasks = timelineRows.filter(({ due }) => due && due < today);
   type WeekItem = { date: string; time: string; kind: string; pill: string; text: string; go: () => void };
   const week: WeekItem[] = [
@@ -206,6 +209,20 @@ export function Dashboard() {
                   <button className="btn small" onClick={() => setScreen("inventory")}>Open</button>
                 </li>
               ))}
+              {noHouse.map((e) => (
+                <li key={"h" + e.id}>
+                  <span className="pill amber">House report</span>
+                  <span>{fmtDate(e.date)} · {e.title || "Performance"}{project ? "" : ` · ${data.projects.find((p) => p.slug === e.project)?.name ?? ""}`} has no house report yet</span>
+                  <button className="btn small" onClick={() => setScreen("reports")}>Fill in</button>
+                </li>
+              ))}
+              {noDaily.length > 0 && (
+                <li>
+                  <span className="pill amber">Daily report</span>
+                  <span>{noDaily.length} work day{noDaily.length > 1 ? "s" : ""} in the last two weeks with no daily report</span>
+                  <button className="btn small" onClick={() => setScreen("reports")}>Open</button>
+                </li>
+              )}
               {overdueTasks.length > 0 && (
                 <li>
                   <span className="pill red">Timeline</span>
@@ -220,14 +237,14 @@ export function Dashboard() {
                   <button className="btn small" onClick={() => setLow(l)}>Fix</button>
                 </li>
               ))}
-              {!overdue.length && !missing.length && !firstLowPerSource.length && !overdueTasks.length && !toReimburse && !gear.length && <li className="muted">Nothing needs attention. Nice.</li>}
+              {!overdue.length && !missing.length && !firstLowPerSource.length && !overdueTasks.length && !toReimburse && !gear.length && !noHouse.length && !noDaily.length && <li className="muted">Nothing needs attention. Nice.</li>}
             </ul>
             {missing.length > 0 && (
               <div style={{ marginTop: 8 }}>
                 <MissingList missing={missing} compact={!!project} />
               </div>
             )}
-            <p className="small muted" style={{ marginTop: 10 }}>House reports, daily reports and sponsor report due dates join this list when Reports is built.</p>
+            <p className="small muted" style={{ marginTop: 10 }}>Sponsor report due dates join this list with Todoist sync.</p>
           </section>
 
           <section className="card" aria-label="This week">

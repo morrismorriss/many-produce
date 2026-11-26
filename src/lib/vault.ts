@@ -25,6 +25,8 @@ import { shoppingFromCSV, shoppingToCSV } from "./shopping";
 import { checkoutsFromCSV, checkoutsToCSV, itemsFromCSV, itemsToCSV } from "./inventory";
 import type { Campaign, Checkout, InventoryItem, ShoppingItem } from "./types";
 import { campaignFromMd, campaignToMd } from "./campaigns";
+import { dailyFromMd, dailyToMd, houseFromMd, houseToMd, savedReportFromMd, savedReportToMd } from "./reports";
+import type { DailyReport, HouseReport, SavedReport, VenueDeal } from "./types";
 import { STARTER_TIMELINE_TEMPLATES, timelineFromMd, timelineTemplateFromMd, timelineTemplateToMd, timelineToMd } from "./timeline";
 
 export const SETTINGS_PATH = ".manyproduce/settings.json";
@@ -80,7 +82,7 @@ function extraKeys(d: Record<string, unknown>, known: string[]): Record<string, 
 
 const PROJECT_KEYS = ["cast", "slug", "name", "color", "subtitle", "status", "type", "start", "end", "opening", "city", "fiscal_sponsor", "sponsor_fee_rate"];
 const PERSON_KEYS = ["name", "roles", "projects", "email", "phone", "city", "rate", "rate_type", "status", "pronouns", "payment_method", "w9_on_file", "w9_date", "notes"];
-const VENUE_KEYS = ["name", "type", "city", "capacity", "rate", "tech_notes", "status", "projects", "next_step", "contact", "hold_dates", "coi_on_file"];
+const VENUE_KEYS = ["deal", "name", "type", "city", "capacity", "rate", "tech_notes", "status", "projects", "next_step", "contact", "hold_dates", "coi_on_file"];
 const SPONSOR_KEYS = ["name", "fee_rate", "fee_applies_to", "contact", "account_url", "review_required_for", "report_schedule"];
 
 const str = (v: unknown) => (v === undefined || v === null ? "" : String(v));
@@ -167,6 +169,7 @@ function venueFromDoc(slug: string, d: Record<string, unknown>, body: string): V
     contact: str(d.contact),
     hold_dates: str(d.hold_dates),
     notes: body.trim(),
+    deal: d.deal && typeof d.deal === "object" ? (d.deal as VenueDeal) : undefined,
     extra: extraKeys(d, VENUE_KEYS),
   };
 }
@@ -310,7 +313,30 @@ export async function loadVault(fs: VaultFS): Promise<VaultData> {
     campaigns.push(campaignFromMd(`campaigns/${e.name}`, (await fs.read(`campaigns/${e.name}`)) ?? ""));
   }
 
-  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates, events, conflicts, scenes, timelines, timelineTemplates, shopping, inventory, checkouts, campaigns };
+  // Reports: reports/*.md and reports/report-templates/*.md
+  const reports: SavedReport[] = [];
+  for (const dir of ["reports", "reports/report-templates"]) {
+    for (const e of await fs.list(dir)) {
+      if (e.is_dir || !e.name.endsWith(".md")) continue;
+      reports.push(savedReportFromMd(`${dir}/${e.name}`, (await fs.read(`${dir}/${e.name}`)) ?? ""));
+    }
+  }
+  const readPerProject = async <T,>(root: string, parse: (path: string, text: string) => T): Promise<T[]> => {
+    const out: T[] = [];
+    for (const pd of await fs.list(root)) {
+      if (!pd.is_dir) continue;
+      for (const e of await fs.list(`${root}/${pd.name}`)) {
+        if (e.is_dir || !e.name.endsWith(".md")) continue;
+        const path = `${root}/${pd.name}/${e.name}`;
+        out.push(parse(path, (await fs.read(path)) ?? ""));
+      }
+    }
+    return out;
+  };
+  const houseReports: HouseReport[] = await readPerProject("house-reports", houseFromMd);
+  const dailyReports: DailyReport[] = await readPerProject("daily-reports", dailyFromMd);
+
+  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates, events, conflicts, scenes, timelines, timelineTemplates, shopping, inventory, checkouts, campaigns, reports, houseReports, dailyReports };
 }
 
 // ---- writers ----
@@ -339,4 +365,7 @@ export const saveShopping = (fs: VaultFS, project: string, items: ShoppingItem[]
 export const saveInventory = (fs: VaultFS, items: InventoryItem[]) => fs.write("inventory/items.csv", itemsToCSV(items));
 export const saveCheckouts = (fs: VaultFS, c: Checkout[]) => fs.write("inventory/checkouts.csv", checkoutsToCSV(c));
 export const saveCampaign = (fs: VaultFS, c: Campaign) => fs.write(c.path, campaignToMd(c));
+export const saveReport = (fs: VaultFS, r: SavedReport) => fs.write(r.path, savedReportToMd(r));
+export const saveHouseReport = (fs: VaultFS, h: HouseReport) => fs.write(h.path, houseToMd(h));
+export const saveDailyReport = (fs: VaultFS, r: DailyReport, people: import("./types").Person[]) => fs.write(r.path, dailyToMd(r, people));
 export const saveSettings = (fs: VaultFS, s: Settings) => fs.write(SETTINGS_PATH, JSON.stringify(s, null, 2));

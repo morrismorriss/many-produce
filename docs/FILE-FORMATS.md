@@ -27,6 +27,10 @@ Many Produce/
     <project>-scenes.csv  # scene breakdown (who's in each scene)
     conflicts.csv         # each person's unavailable dates and times
   campaigns/<date>-<slug>.md  # marketing and fundraising campaigns
+  reports/<date>-<slug>.md    # saved sponsor/funder reports (settings + snapshot + notes)
+  reports/report-templates/<slug>.md
+  house-reports/<project>/<date>.md
+  daily-reports/<project>/<date>.md
   inventory/
     items.csv             # Equipment log items (owned, borrowed, rented)
     checkouts.csv         # who has what, when it's due back, condition out/in
@@ -267,6 +271,44 @@ linked_entries: [e12, e15]   # Bookkeeping entries this campaign brought in
 ---
 The draft or notes.
 ```
+
+## reports/&lt;date&gt;-&lt;slug&gt;.md
+
+The frontmatter holds `title`, `settings` (`report_for` sponsor slug, `funder_name`, `grant_number`, `projects`, `from`, `to`, `include`), `sent` (date) and `snapshot` (received, spent, balance, sponsor fees, period, projects and attendance at the time it was saved). The body holds the producer notes. Templates in `reports/report-templates/` have `template: true` and no snapshot.
+
+**Restricted funds:** an income entry tagged *Restricted* has its restriction in `restricted_to`. An expense with the same `restricted_to` text counts as spent against it.
+
+## house-reports/&lt;project&gt;/&lt;date&gt;.md
+
+```yaml
+---
+project: prodigy
+date: 2026-11-19
+venue: hop-hall
+call_time: "18:30"
+start_time: "19:38"
+capacity: 80
+tickets: [{ type: Full, sold: 41, price: 25 }, { type: Student, sold: 9, price: 15 }]
+comps: [{ who: "Press: Chicago Reader", why: Review }]
+walkups: 7
+no_shows: 3
+attendance: null        # typed in, or counted: sold + comps − no-shows
+gross: null             # typed in, or from tickets
+platform_fees: 61.5
+bar_sales: 520
+foh_notes: …
+incidents: ""
+venue_notes: ""
+---
+```
+
+## venues/&lt;slug&gt;.md: deal terms
+
+A venue can carry `deal: { basis: night | run, flat_rental, door_split (0–1, the venue's share), guarantee, versus (whichever is higher), bar_minimum, venue_collects_box_office, fees: [{ label, amount }] }`. The venue settlement uses these terms.
+
+## daily-reports/&lt;project&gt;/&lt;date&gt;.md
+
+The frontmatter holds `kind`, `location`, `planned_end`, `first_start`, `meal_start`, `meal_end`, `wrap`, `calls: [{ person, call, in, out, late, absent }]`, `scenes: [{ scene, planned_pages, shot_pages, status }]` (pages in eighths), `setups`, `takes`, `used_items` (Equipment log ids), `injuries`, `damage`, `dept_notes` and `tomorrow`. `followups_done` is set once the follow-ups are made. The body is the plain-text report.
 
 ## .manyproduce/settings.json
 

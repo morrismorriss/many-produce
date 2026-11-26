@@ -5,6 +5,8 @@ export type ProjectStatus = "planning" | "in production" | "closed";
 export type ProjectType = "Theater" | "Film" | "Other";
 
 export interface Project {
+  /** Frontmatter keys the app doesn't know about, kept as-is on save. */
+  extra?: Record<string, unknown>;
   slug: string;
   name: string;
   color: string;
@@ -48,7 +50,8 @@ export interface LedgerEntry {
 
 export const AUTO_FEE_PREFIX = "auto-fee:";
 
-export type BudgetType = "expense" | "income";
+/** Matches Many Apply's budget types. In-kind lines count toward income but never move cash. */
+export type BudgetType = "expense" | "income" | "in-kind";
 export type Confidence = "Confirmed" | "Likely" | "Hoped for";
 
 /** Same 7 leading columns as Many Apply's budget builder, plus extras. */
@@ -88,6 +91,8 @@ export interface Payment {
 
 export type PersonStatus = "Reached out" | "Offer out" | "Confirmed" | "Past collaborator";
 export interface Person {
+  /** Frontmatter keys the app doesn't know about, kept as-is on save. */
+  extra?: Record<string, unknown>;
   slug: string;
   name: string;
   roles: string[];
@@ -106,6 +111,8 @@ export interface Person {
 
 export type VenueStatus = "Contacted" | "Toured" | "Hold" | "Booked" | "Passed";
 export interface Venue {
+  /** Frontmatter keys the app doesn't know about, kept as-is on save. */
+  extra?: Record<string, unknown>;
   slug: string;
   name: string;
   type: string;
@@ -122,6 +129,8 @@ export interface Venue {
 }
 
 export interface Sponsor {
+  /** Frontmatter keys the app doesn't know about, kept as-is on save. */
+  extra?: Record<string, unknown>;
   slug: string;
   name: string;
   fee_rate: number;

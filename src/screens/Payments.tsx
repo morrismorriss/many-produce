@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { groupOf, paymentsToICS, type PaymentGroup } from "../lib/payments";
 import type { Payment } from "../lib/types";
 import { allocTouches, allocValid, fmtDate, round2, shareOf, single, uid } from "../lib/util";
-import { useApp } from "../state/AppState";
-import { AllocTags, Empty, Field, Modal, Plus, Tile, saveTextFile } from "../ui/bits";
-import { Header } from "../ui/Shell";
+import { useApp } from "../store";
+import { AllocTags, Empty, Field, Modal, Plus, Tile, saveTextFile } from "../components/bits";
+import { Header } from "../components/Shell";
 import { SplitEditor } from "./Bookkeeping";
 
 const GROUPS: PaymentGroup[] = ["Overdue", "Next 30 days", "Later", "Paid"];

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window: core plus folder/file pickers.",
+  "description": "Main window: core (incl. events), folder/file pickers.",
   "windows": ["main"],
   "permissions": ["core:default", "dialog:default"]
 }

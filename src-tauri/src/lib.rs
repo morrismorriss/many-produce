@@ -4,6 +4,7 @@
 //! file commands that are scoped to the vault folder the user picked, so the
 //! web view can never read or write outside it.
 
+use notify::{RecursiveMode, Watcher};
 use serde::Serialize;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -12,6 +13,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Default)]
 struct VaultState(Mutex<Option<PathBuf>>);
+
+/// Watches the vault so edits made in other apps show up straight away.
+#[derive(Default)]
+struct WatchState(Mutex<Option<notify::RecommendedWatcher>>);
 
 #[derive(Serialize)]
 struct Entry {
@@ -41,11 +46,104 @@ fn resolve(root: &Path, rel: &str) -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-fn vault_open(state: tauri::State<VaultState>, path: String) -> Result<(), String> {
+fn vault_open(
+    app: tauri::AppHandle,
+    state: tauri::State<VaultState>,
+    watch: tauri::State<WatchState>,
+    path: String,
+) -> Result<(), String> {
+    use tauri::Emitter;
     let p = PathBuf::from(&path);
     fs::create_dir_all(&p).map_err(|e| e.to_string())?;
-    *state.0.lock().map_err(|e| e.to_string())? = Some(p);
+    *state.0.lock().map_err(|e| e.to_string())? = Some(p.clone());
+
+    // Replace any previous watcher. Events carry vault-relative paths.
+    let root = p.canonicalize().unwrap_or(p.clone());
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        if let Ok(ev) = res {
+            if matches!(ev.kind, notify::EventKind::Access(_)) {
+                return;
+            }
+            let rels: Vec<String> = ev
+                .paths
+                .iter()
+                .filter_map(|x| x.strip_prefix(&root).ok())
+                .map(|x| x.to_string_lossy().replace('\\', "/"))
+                .collect();
+            if !rels.is_empty() {
+                let _ = app.emit("vault-changed", rels);
+            }
+        }
+    })
+    .map_err(|e| e.to_string())?;
+    watcher.watch(&p, RecursiveMode::Recursive).map_err(|e| e.to_string())?;
+    *watch.0.lock().map_err(|e| e.to_string())? = Some(watcher);
     Ok(())
+}
+
+#[tauri::command]
+fn vault_close(state: tauri::State<VaultState>, watch: tauri::State<WatchState>) -> Result<(), String> {
+    *watch.0.lock().map_err(|e| e.to_string())? = None;
+    *state.0.lock().map_err(|e| e.to_string())? = None;
+    Ok(())
+}
+
+/// Read any vault file as base64 (receipts and PDFs for the year-end packet).
+#[tauri::command]
+fn vault_read_base64(state: tauri::State<VaultState>, path: String) -> Result<Option<String>, String> {
+    let p = resolve(&root(&state)?, &path)?;
+    if !p.exists() {
+        return Ok(None);
+    }
+    let bytes = fs::read(p).map_err(|e| e.to_string())?;
+    Ok(Some(b64(&bytes)))
+}
+
+/// Write an export (zip, PDF) given as base64 to a path the user chose.
+#[tauri::command]
+fn export_file_base64(path: String, data: String) -> Result<(), String> {
+    fs::write(path, unb64(&data)?).map_err(|e| e.to_string())
+}
+
+/// Open a vault file in the user's default app (e.g. a signed PDF).
+#[tauri::command]
+fn vault_open_file(state: tauri::State<VaultState>, path: String) -> Result<(), String> {
+    let p = resolve(&root(&state)?, &path)?;
+    tauri_plugin_opener::open_path(p, None::<&str>).map_err(|e| e.to_string())
+}
+
+const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+fn b64(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 4 / 3 + 4);
+    for chunk in bytes.chunks(3) {
+        let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
+        let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
+        out.push(B64[(n >> 18) as usize & 63] as char);
+        out.push(B64[(n >> 12) as usize & 63] as char);
+        out.push(if chunk.len() > 1 { B64[(n >> 6) as usize & 63] as char } else { '=' });
+        out.push(if chunk.len() > 2 { B64[n as usize & 63] as char } else { '=' });
+    }
+    out
+}
+
+fn unb64(s: &str) -> Result<Vec<u8>, String> {
+    let mut out = Vec::with_capacity(s.len() * 3 / 4);
+    let mut buf = 0u32;
+    let mut bits = 0;
+    for c in s.bytes() {
+        if c == b'=' || c.is_ascii_whitespace() {
+            continue;
+        }
+        let v = B64.iter().position(|&x| x == c).ok_or("Bad base64")? as u32;
+        buf = (buf << 6) | v;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((buf >> bits) as u8);
+        }
+    }
+    Ok(out)
 }
 
 #[tauri::command]
@@ -125,9 +223,15 @@ fn export_file(path: String, contents: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(VaultState::default())
+        .manage(WatchState::default())
         .invoke_handler(tauri::generate_handler![
             vault_open,
+            vault_close,
+            vault_read_base64,
+            export_file_base64,
+            vault_open_file,
             vault_read,
             vault_write,
             vault_list,
@@ -143,6 +247,14 @@ pub fn run() {
 mod tests {
     use super::resolve;
     use std::path::Path;
+
+    #[test]
+    fn base64_round_trip() {
+        for s in [&b""[..], b"a", b"ab", b"abc", b"hello world \x00\xff"] {
+            assert_eq!(super::unb64(&super::b64(s)).unwrap(), s);
+        }
+        assert_eq!(super::b64(b"Many"), "TWFueQ==");
+    }
 
     #[test]
     fn rejects_escapes() {

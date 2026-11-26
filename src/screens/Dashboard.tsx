@@ -5,9 +5,9 @@ import { buildForecast, forecastToCSV, type ForecastItem, type LowPoint, type Sc
 import { groupOf } from "../lib/payments";
 import type { Payment } from "../lib/types";
 import { addDays, allocTouches, fmtDate, round2, shareOf } from "../lib/util";
-import { useApp } from "../state/AppState";
-import { Modal, Progress, ProjectTag, Tile, saveTextFile } from "../ui/bits";
-import { Header } from "../ui/Shell";
+import { useApp } from "../store";
+import { Modal, Progress, ProjectTag, Tile, saveTextFile } from "../components/bits";
+import { Header } from "../components/Shell";
 import { PaymentModal } from "./Payments";
 
 export function Dashboard() {

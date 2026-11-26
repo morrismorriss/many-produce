@@ -1,5 +1,5 @@
-import type { Screen } from "../state/AppState";
-import { Header, NAV } from "../ui/Shell";
+import type { Screen } from "../store";
+import { Header, NAV } from "../components/Shell";
 
 const PLANS: Partial<Record<Screen, string[]>> = {
   shopping: ["Everything a show needs to buy, rent or borrow, with buyer tags (Producer, designers, someone else, unassigned).", "Reimbursements that turn into payments and ledger entries.", "Printable buyer lists."],

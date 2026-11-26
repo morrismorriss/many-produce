@@ -9,15 +9,28 @@ export const BUDGET_COLUMNS = [
   "id", "expected_date", "confidence", "through_sponsor", "source",
 ] as const;
 
+function budgetType(t: string | undefined): BudgetLine["type"] {
+  const v = (t || "expense").trim().toLowerCase().replace(/[\s_]+/g, "-");
+  if (v === "income") return "income";
+  if (v === "in-kind" || v === "inkind") return "in-kind";
+  return "expense";
+}
+
+/** Many Apply's export adds totals/gap rows; they aren't budget lines. */
+function isTotalsRow(r: Record<string, string>): boolean {
+  const label = `${r.line_item ?? ""} ${r.category ?? ""}`.trim().toLowerCase();
+  return !r.category?.trim() && /^(total|subtotal|gap|grand total)\b/.test(label || "total");
+}
+
 export function budgetFromCSV(text: string): BudgetLine[] {
-  return parseCSV(text).map((r, i) => {
+  return parseCSV(text).filter((r) => !isTotalsRow(r)).map((r, i) => {
     const quantity = r.quantity === "" || r.quantity === undefined ? 1 : Number(r.quantity);
     const rate = Number(r.rate) || 0;
     const amount = r.amount !== undefined && r.amount !== "" ? Number(r.amount) : quantity * rate;
     return {
       id: r.id || `b${i + 1}`,
       category: r.category ?? "Other",
-      type: (r.type || "expense").toLowerCase() === "income" ? "income" : "expense",
+      type: budgetType(r.type),
       line_item: r.line_item ?? "",
       quantity,
       rate,
@@ -31,16 +44,18 @@ export function budgetFromCSV(text: string): BudgetLine[] {
   });
 }
 
+const TYPE_LABEL: Record<BudgetLine["type"], string> = { expense: "Expense", income: "Income", "in-kind": "In-kind" };
+
 export function budgetToCSV(lines: BudgetLine[]): string {
   return toCSV(
     BUDGET_COLUMNS,
-    lines.map((l) => ({ ...l, through_sponsor: l.through_sponsor ? "yes" : "" })),
+    lines.map((l) => ({ ...l, type: TYPE_LABEL[l.type], through_sponsor: l.through_sponsor ? "yes" : "" })),
   );
 }
 
-/** Export just Many Apply's 7 columns. */
+/** Export just Many Apply's 7 columns, so it opens in Many Apply's budget builder. */
 export function budgetToManyApplyCSV(lines: BudgetLine[]): string {
-  return toCSV(BUDGET_COLUMNS.slice(0, 7), lines as unknown as Record<string, unknown>[]);
+  return toCSV(BUDGET_COLUMNS.slice(0, 7), lines.map((l) => ({ ...l, type: TYPE_LABEL[l.type] })));
 }
 
 export interface ExpenseRow {
@@ -95,17 +110,18 @@ export function incomeActuals(
   sponsors: Sponsor[],
 ): IncomeRow[] {
   const { rate } = projectFeeRate(project, sponsors);
-  const inc = lines.filter((l) => l.type === "income");
+  const inc = lines.filter((l) => l.type === "income" || l.type === "in-kind");
   const pool = ledger
     .filter((e) => e.kind === "income" && shareOf(e.project_alloc, project.slug) > 0)
     .map((e) => ({ e, left: e.amount * shareOf(e.project_alloc, project.slug) }));
-  const rows: IncomeRow[] = inc.map((line) => ({ line, raised: 0, goalNet: 0, raisedNet: 0, feeRate: line.through_sponsor ? rate : 0 }));
+  const rows: IncomeRow[] = inc.map((line) => ({ line, raised: 0, goalNet: 0, raisedNet: 0, feeRate: line.through_sponsor && line.type === "income" ? rate : 0 }));
   // First pass: lines with a source match category+source; second: category only.
   for (const strict of [true, false]) {
     for (const r of rows) {
       if (strict && !r.line.source) continue;
       for (const p of pool) {
         if (p.left <= 0 || p.e.category !== r.line.category) continue;
+        if ((r.line.type === "in-kind") !== p.e.tags.includes("In-kind") && r.line.category !== "In-kind") continue;
         if (strict && p.e.source !== r.line.source) continue;
         const room = r.line.amount - r.raised;
         if (room <= 0) break;

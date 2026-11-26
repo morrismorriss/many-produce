@@ -7,12 +7,12 @@ import { Payments } from "./screens/Payments";
 import { Collaborators, Venues } from "./screens/People";
 import { Placeholder } from "./screens/Placeholder";
 import { Settings } from "./screens/Settings";
-import { AppProvider, useApp } from "./state/AppState";
-import { Drawer } from "./ui/Drawer";
-import { CommandPalette, NAV, Sidebar, Toasts } from "./ui/Shell";
-import { isTauri, MemoryFS, openDesktopVault, type VaultFS } from "./vault/fs";
-import { sampleVault } from "./vault/seed";
-import { loadVault } from "./vault/store";
+import { useApp, useStore } from "./store";
+import { Drawer } from "./components/Drawer";
+import { CommandPalette, NAV, Sidebar, Toasts } from "./components/Shell";
+import { isTauri, MemoryFS, openDesktopVault, type VaultFS } from "./lib/fs";
+import { sampleVault } from "./lib/seed";
+import { loadVault } from "./lib/vault";
 
 const LAST_VAULT = "many-produce:last-vault";
 
@@ -25,13 +25,16 @@ function lsSet(k: string, v: string | null) {
 
 export default function App() {
   const [vault, setVault] = useState<{ fs: VaultFS; data: VaultData } | null>(null);
+  const [ready, setReady] = useState(false);
   const [booting, setBooting] = useState(true);
   const [error, setError] = useState("");
 
   const open = async (fs: VaultFS) => {
     try {
       const data = await loadVault(fs);
+      useStore.getState().init(fs, data);
       setVault({ fs, data });
+      setReady(true);
       if (fs.kind === "desktop") lsSet(LAST_VAULT, fs.root);
     } catch (e) {
       setError(String(e));
@@ -52,12 +55,8 @@ export default function App() {
   }, []);
 
   if (booting) return null;
-  if (!vault) return <Welcome onOpen={open} error={error} />;
-  return (
-    <AppProvider fs={vault.fs} initial={vault.data} key={vault.fs.root}>
-      <Frame onSwitchVault={() => { lsSet(LAST_VAULT, null); setVault(null); }} />
-    </AppProvider>
-  );
+  if (!vault || !ready) return <Welcome onOpen={open} error={error} />;
+  return <Frame key={vault.fs.root} onSwitchVault={() => { lsSet(LAST_VAULT, null); vault.fs.close?.(); setReady(false); setVault(null); }} />;
 }
 
 function Welcome({ onOpen, error }: { onOpen: (fs: VaultFS) => void; error: string }) {
@@ -120,7 +119,15 @@ function useTheme() {
 }
 
 function Frame({ onSwitchVault }: { onSwitchVault: () => void }) {
-  const { screen, drawer, openDrawer, fireNewItem } = useApp();
+  const { screen, drawer, openDrawer, fireNewItem, fs, reload } = useApp();
+
+  // Pick up edits made in other apps straight away.
+  useEffect(() => {
+    if (!fs.watch) return;
+    let un: (() => void) | undefined;
+    void fs.watch(() => void reload(true)).then((u) => (un = u));
+    return () => un?.();
+  }, [fs, reload]);
   const [sidebar, setSidebar] = useState(true);
   const [palette, setPalette] = useState(false);
   useTheme();

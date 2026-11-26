@@ -3,9 +3,9 @@ import { budgetFromCSV, budgetToCSV, budgetToManyApplyCSV, expenseActuals, incom
 import { projectFeeRate } from "../lib/ledger";
 import type { BudgetLine, Confidence } from "../lib/types";
 import { fmtDate, round2, uid } from "../lib/util";
-import { useApp } from "../state/AppState";
-import { EditCell, Empty, Modal, Plus, Progress, ProjectTag, Tile, saveTextFile } from "../ui/bits";
-import { Header } from "../ui/Shell";
+import { useApp } from "../store";
+import { EditCell, Empty, Modal, Plus, Progress, ProjectTag, Tile, saveTextFile } from "../components/bits";
+import { Header } from "../components/Shell";
 
 export function Budget() {
   const { data, project, money, saveBudget, newItemSignal } = useApp();
@@ -198,6 +198,7 @@ function IncomeRowView({ slug, row, showProject, feeLabel }: { slug: string; row
         <div style={{ flex: 1, minWidth: 0 }}>
           <EditCell label="Income source" value={l.line_item} onSave={(v) => update(l.id, { line_item: v })} />
         </div>
+        {l.type === "in-kind" && <span className="pill amber" title="Counts toward income, never moves cash">In-kind</span>}
         {showProject && <ProjectTag slug={slug} />}
         <button className="icon-btn" aria-label={`Delete ${l.line_item}`} onClick={() => remove(l.id)}>×</button>
       </div>
@@ -207,6 +208,10 @@ function IncomeRowView({ slug, row, showProject, feeLabel }: { slug: string; row
         {l.through_sponsor && feeLabel.rate > 0 && <> · net of {+(feeLabel.rate * 100).toFixed(2)}% {feeLabel.sponsor?.name ?? "sponsor"} fee</>}
       </div>
       <div className="form-grid" style={{ marginTop: 6, gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 6 }}>
+        <select className="input small" aria-label="Type" value={l.type} onChange={(e) => update(l.id, { type: e.target.value as BudgetLine["type"] })}>
+          <option value="income">Income</option>
+          <option value="in-kind">In-kind</option>
+        </select>
         <select className="input small" aria-label="Category" value={l.category} onChange={(e) => update(l.id, { category: e.target.value })}>
           {data.settings.income_categories.map((c) => <option key={c}>{c}</option>)}
         </select>

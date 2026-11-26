@@ -4,7 +4,7 @@ import { fmtDate } from "../lib/util";
 import { EntryForm } from "../screens/Bookkeeping";
 import { PersonModal, VenueModal } from "../screens/People";
 import { PaymentModal } from "../screens/Payments";
-import { useApp } from "../state/AppState";
+import { useApp } from "../store";
 import { AllocTags, Initials, ProjectTag, X } from "./bits";
 
 export function Drawer() {

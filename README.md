@@ -25,7 +25,7 @@ This build covers phases 1 to 3 of the spec, plus the basics of Collaborators an
 | **Venues** | Card grid with status counts. The drawer shows the deposit schedule, linked from Payments. |
 | **Settings** | Vault, theme (Light, Dark, Pink or follow system), currency, money sources with opening balances, low-balance cushion, fiscal sponsors and fee rates, categories and tags. |
 
-Also included: the Cmd/Ctrl+K command palette (jumps to any screen, project, person, venue, entry or payment), Cmd/Ctrl+N for a new item, Cmd/Ctrl+\ to toggle the sidebar and Cmd/Ctrl+. to close the drawer. Changes save automatically, deletes can be undone, and nothing is hard-deleted: deleted files go to `.manyproduce/trash/`. The desktop app reloads the vault when its window regains focus, so edits made in other apps show up.
+Also included: the Cmd/Ctrl+K command palette (jumps to any screen, project, person, venue, entry or payment), Cmd/Ctrl+N for a new item, Cmd/Ctrl+\ to toggle the sidebar and Cmd/Ctrl+. to close the drawer. Changes save automatically, deletes can be undone, and nothing is hard-deleted: deleted files go to `.manyproduce/trash/`. The desktop app watches the vault folder, so edits made in other apps show up straight away.
 
 The other screens in the sidebar (Shopping list, Paperwork, Schedule, Timeline, Stripboard, Clearances, Who has what, Campaigns, Templates and Reports) are marked **soon**. Each one shows what it will do.
 
@@ -42,7 +42,7 @@ The other screens in the sidebar (Shopping list, Paperwork, Schedule, Timeline, 
 9. Stripboard (breakdown, board, day out of days) and Clearances
 10. Todoist sync, CSV import/export, backup, packaging, GitHub Releases (the release workflow is already in `.github/workflows/release.yml`)
 
-Not built yet: the theme builder, the shared theme folder, and live folder watching (the app reloads on window focus instead).
+Not built yet: the theme builder and the shared theme folder.
 
 ## Running it
 
@@ -88,18 +88,20 @@ Push a `v*` tag to build unsigned Mac, Windows and Linux installers on GitHub Ac
 
 - **Tauri 2** desktop shell. The Rust side (`src-tauri/src/lib.rs`) only exposes a few file commands, scoped to the vault folder you picked.
 - **React + TypeScript + Vite** front end. Charts use Recharts. Inter and Space Grotesk fonts are bundled, so everything works offline.
-- All the money logic is plain TypeScript in `src/lib/`, with unit tests in `src/lib/lib.test.ts`.
-- `src/vault/` reads and writes the vault. `docs/FILE-FORMATS.md` describes every file.
+- All the money logic is plain TypeScript in `src/lib/`, with unit tests in `tests/`. `docs/FILE-FORMATS.md` describes every file.
 
 ```
 src/
-  lib/        types, ledger + sponsor fees, budget, payments, forecast, CSV/frontmatter
-  vault/      file access (desktop + browser), load/save, sample data
-  state/      app state and every save action
-  screens/    Dashboard, Bookkeeping, Budget, Payments, Collaborators/Venues, Settings
-  ui/         sidebar, header, command palette, drawer, shared bits
-src-tauri/    Rust shell
+  lib/          vault format, money logic (ledger + sponsor fees, budget, payments, forecast), CSV/frontmatter
+  lib/fs/       one filesystem interface, with Tauri and in-memory (browser preview) backends
+  components/   sidebar, header, command palette, drawer, inline editors
+  screens/      one file per screen
+  store.ts      app state (zustand)
+src-tauri/      Rust shell: vault-scoped file commands, folder watcher, opening files
+tests/          unit tests (vitest)
 ```
+
+The layout, file conventions and tooling match Many Apply's, so the two codebases feel the same to work in. Budget CSVs use Many Apply's columns and its `Expense / Income / In-kind` types, and totals rows from its export are skipped on import. Unknown frontmatter keys are kept on save, and the app watches the vault folder, so edits made in Obsidian or a text editor show up straight away.
 
 ## License
 

@@ -117,7 +117,7 @@ export function buildForecast(inp: ForecastInput): Forecast {
     const fund = sponsorFund(proj, inp.sources);
     for (const r of incomeActuals(lines, inp.ledger, proj, inp.sponsors)) {
       const c = r.line.confidence;
-      if (!r.line.expected_date) continue;
+      if (!r.line.expected_date || r.line.type === "in-kind") continue; // in-kind never moves cash
       if (!(c === "Confirmed" || (inp.scenario === "likely" && c === "Likely"))) continue;
       const remaining = r.line.amount - r.raised;
       if (remaining <= 0.005) continue;

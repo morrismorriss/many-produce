@@ -1,8 +1,8 @@
 // Read and write the whole vault as plain files.
-import { budgetFromCSV, budgetToCSV } from "../lib/budget";
-import { parseFrontmatter, stringifyFrontmatter } from "../lib/files";
-import { byYear, ledgerFromCSV, ledgerToCSV } from "../lib/ledger";
-import { paymentsFromMd, paymentsToMd } from "../lib/payments";
+import { budgetFromCSV, budgetToCSV } from "./budget";
+import { parseFrontmatter, stringifyFrontmatter } from "./files";
+import { byYear, ledgerFromCSV, ledgerToCSV } from "./ledger";
+import { paymentsFromMd, paymentsToMd } from "./payments";
 import {
   DEFAULT_SETTINGS,
   OVERHEAD_SLUG,
@@ -15,7 +15,7 @@ import {
   type Sponsor,
   type Venue,
   type VaultData,
-} from "../lib/types";
+} from "./types";
 import type { VaultFS } from "./fs";
 
 export const SETTINGS_PATH = ".manyproduce/settings.json";
@@ -62,6 +62,18 @@ export const OVERHEAD_PROJECT: Project = {
   notes: "Shared costs: website, insurance, software, general donations.",
 };
 
+/** Keys of d that aren't in known, so hand-added frontmatter survives a save. */
+function extraKeys(d: Record<string, unknown>, known: string[]): Record<string, unknown> | undefined {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(d)) if (!known.includes(k)) out[k] = v;
+  return Object.keys(out).length ? out : undefined;
+}
+
+const PROJECT_KEYS = ["slug", "name", "color", "subtitle", "status", "type", "start", "end", "opening", "city", "fiscal_sponsor", "sponsor_fee_rate"];
+const PERSON_KEYS = ["name", "roles", "projects", "email", "phone", "city", "rate", "rate_type", "status", "pronouns", "payment_method", "w9_on_file", "w9_date", "notes"];
+const VENUE_KEYS = ["name", "type", "city", "capacity", "rate", "tech_notes", "status", "projects", "next_step", "contact", "hold_dates", "coi_on_file"];
+const SPONSOR_KEYS = ["name", "fee_rate", "fee_applies_to", "contact", "account_url", "review_required_for", "report_schedule"];
+
 const str = (v: unknown) => (v === undefined || v === null ? "" : String(v));
 const arr = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : v ? String(v).split(/,\s*/) : []);
 
@@ -93,13 +105,14 @@ function projectFromDoc(slug: string, d: Record<string, unknown>, body: string):
     sponsor_fee_rate: d.sponsor_fee_rate === undefined || d.sponsor_fee_rate === null || d.sponsor_fee_rate === "" ? null : Number(d.sponsor_fee_rate),
     builtin: slug === OVERHEAD_SLUG,
     notes: body.trim(),
+    extra: extraKeys(d, PROJECT_KEYS),
   };
 }
 
 export function projectToMd(p: Project): string {
-  const { notes, builtin, ...data } = p;
+  const { notes, builtin, extra, ...data } = p;
   void builtin;
-  return stringifyFrontmatter(data, notes);
+  return stringifyFrontmatter({ ...extra, ...data }, notes);
 }
 
 function personFromDoc(slug: string, d: Record<string, unknown>, body: string): Person {
@@ -118,13 +131,14 @@ function personFromDoc(slug: string, d: Record<string, unknown>, body: string): 
     payment_method: str(d.payment_method),
     w9_on_file: d.w9_on_file === true || d.w9_on_file === "yes",
     notes: body.trim() || str(d.notes),
+    extra: extraKeys(d, PERSON_KEYS),
   };
 }
 
 export function personToMd(p: Person): string {
-  const { slug, notes, w9_on_file, ...data } = p;
+  const { slug, notes, w9_on_file, extra, ...data } = p;
   void slug;
-  return stringifyFrontmatter({ ...data, w9_on_file: w9_on_file ? "yes" : "no" }, notes);
+  return stringifyFrontmatter({ ...extra, ...data, w9_on_file: w9_on_file ? "yes" : "no" }, notes);
 }
 
 function venueFromDoc(slug: string, d: Record<string, unknown>, body: string): Venue {
@@ -142,13 +156,14 @@ function venueFromDoc(slug: string, d: Record<string, unknown>, body: string): V
     contact: str(d.contact),
     hold_dates: str(d.hold_dates),
     notes: body.trim(),
+    extra: extraKeys(d, VENUE_KEYS),
   };
 }
 
 export function venueToMd(v: Venue): string {
-  const { slug, notes, ...data } = v;
+  const { slug, notes, extra, ...data } = v;
   void slug;
-  return stringifyFrontmatter(data, notes);
+  return stringifyFrontmatter({ ...extra, ...data }, notes);
 }
 
 function sponsorFromDoc(slug: string, d: Record<string, unknown>, body: string): Sponsor {
@@ -162,13 +177,14 @@ function sponsorFromDoc(slug: string, d: Record<string, unknown>, body: string):
     review_required_for: arr(d.review_required_for),
     report_schedule: str(d.report_schedule),
     notes: body.trim(),
+    extra: extraKeys(d, SPONSOR_KEYS),
   };
 }
 
 export function sponsorToMd(s: Sponsor): string {
-  const { slug, notes, ...data } = s;
+  const { slug, notes, extra, ...data } = s;
   void slug;
-  return stringifyFrontmatter(data, notes);
+  return stringifyFrontmatter({ ...extra, ...data }, notes);
 }
 
 /** Make sure the built-in pieces exist (overhead project, sponsor presets, settings). */

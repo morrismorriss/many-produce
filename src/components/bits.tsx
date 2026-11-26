@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { Alloc } from "../lib/types";
-import { useApp } from "../state/AppState";
+import { useApp } from "../store";
 
 export function ProjectTag({ slug, share }: { slug: string; share?: number }) {
   const { projectBySlug } = useApp();

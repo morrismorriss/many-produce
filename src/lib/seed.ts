@@ -1,8 +1,8 @@
 // A small sample vault so the app has something to show on first run
 // ("Try with sample data") and in the browser demo. Dates are relative to today.
-import { budgetToCSV } from "../lib/budget";
-import { ledgerToCSV, upsertWithFees } from "../lib/ledger";
-import { paymentsToMd } from "../lib/payments";
+import { budgetToCSV } from "./budget";
+import { ledgerToCSV, upsertWithFees } from "./ledger";
+import { paymentsToMd } from "./payments";
 import {
   DEFAULT_SETTINGS,
   FISCAL_TAG,
@@ -14,9 +14,9 @@ import {
   type Project,
   type Settings,
   type Venue,
-} from "../lib/types";
-import { addDays, todayISO } from "../lib/util";
-import { OVERHEAD_PROJECT, PRESET_SPONSORS, SETTINGS_PATH, personToMd, projectToMd, sponsorToMd, venueToMd } from "./store";
+} from "./types";
+import { addDays, todayISO } from "./util";
+import { OVERHEAD_PROJECT, PRESET_SPONSORS, SETTINGS_PATH, personToMd, projectToMd, sponsorToMd, venueToMd } from "./vault";
 
 export function sampleVault(today = todayISO()): Record<string, string> {
   const d = (n: number) => addDays(today, n);

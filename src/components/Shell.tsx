@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { groupOf } from "../lib/payments";
 import type { Project } from "../lib/types";
 import { uniqueSlug } from "../lib/util";
-import { useApp, type Screen } from "../state/AppState";
+import { useApp, type Screen } from "../store";
 import { Field, Modal, Plus } from "./bits";
 
 export const NAV: { id: Screen; label: string; phase?: number }[] = [

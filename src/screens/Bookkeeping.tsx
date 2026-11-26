@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { earnedIncomeNote, isAutoFee, signedShare, totals } from "../lib/ledger";
 import { DIRECT_SOURCE, FISCAL_TAG, type Alloc, type EntryKind, type LedgerEntry } from "../lib/types";
 import { allocTouches, allocValid, fmtDate, round2, single, uid } from "../lib/util";
-import { useApp } from "../state/AppState";
-import { AllocTags, Chips, Empty, Field, Plus, Tile, saveTextFile } from "../ui/bits";
-import { Header } from "../ui/Shell";
+import { useApp } from "../store";
+import { AllocTags, Chips, Empty, Field, Plus, Tile, saveTextFile } from "../components/bits";
+import { Header } from "../components/Shell";
 import { ledgerToCSV } from "../lib/ledger";
 
 type Filter = "All entries" | "Income" | "Expenses";

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Person, Venue, VenueStatus } from "../lib/types";
 import { uniqueSlug } from "../lib/util";
-import { useApp } from "../state/AppState";
-import { Chips, Empty, Field, Initials, Modal, Plus, ProjectTag } from "../ui/bits";
-import { Header } from "../ui/Shell";
+import { useApp } from "../store";
+import { Chips, Empty, Field, Initials, Modal, Plus, ProjectTag } from "../components/bits";
+import { Header } from "../components/Shell";
 
 const BASE_ROLES = ["Director", "Actor", "Stage manager", "Lighting", "Sound", "Costumes", "Fight choreo", "Photographer"];
 const STATUS_PILL: Record<string, string> = { Confirmed: "green", "Offer out": "blue", "Reached out": "", "Past collaborator": "" };

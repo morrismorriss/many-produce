@@ -15,21 +15,58 @@ export interface VaultFS {
   list(dir: string): Promise<DirEntry[]>;
   trash(path: string): Promise<string>;
   importFile?(source: string, dest: string): Promise<void>;
+  /** Read any file (binary too) as base64. */
+  readBase64?(path: string): Promise<string | null>;
+  /** Open a vault file in the user's default app. */
+  openFile?(path: string): Promise<void>;
+  /** Call back (debounced) when files change outside the app. Returns an unsubscribe. */
+  watch?(onChange: (paths: string[]) => void): Promise<() => void>;
+  close?(): void;
 }
 
 export const isTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export async function openDesktopVault(root: string): Promise<VaultFS> {
   const { invoke } = await import("@tauri-apps/api/core");
+  const { listen } = await import("@tauri-apps/api/event");
   await invoke("vault_open", { path: root });
+
+  // Our own writes also fire watcher events; remember them so only outside
+  // edits (Obsidian, a text editor, a sync client) trigger a reload.
+  const ours = new Map<string, number>();
+  const mark = (path: string) => ours.set(path, Date.now());
+  const isOurs = (path: string) => {
+    if (path.endsWith(".mp-tmp") || path.startsWith(".manyproduce/trash")) return true;
+    const t = ours.get(path);
+    return t !== undefined && Date.now() - t < 3000;
+  };
+
   return {
     kind: "desktop",
     root,
     read: (path) => invoke<string | null>("vault_read", { path }),
-    write: (path, contents) => invoke<void>("vault_write", { path, contents }),
+    write: (path, contents) => { mark(path); return invoke<void>("vault_write", { path, contents }); },
     list: (path) => invoke<DirEntry[]>("vault_list", { path }),
-    trash: (path) => invoke<string>("vault_trash", { path }),
-    importFile: (source, dest) => invoke<void>("vault_import_file", { source, dest }),
+    trash: (path) => { mark(path); return invoke<string>("vault_trash", { path }); },
+    importFile: (source, dest) => { mark(dest); return invoke<void>("vault_import_file", { source, dest }); },
+    readBase64: (path) => invoke<string | null>("vault_read_base64", { path }),
+    openFile: (path) => invoke<void>("vault_open_file", { path }),
+    watch: async (onChange) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const pending = new Set<string>();
+      const un = await listen<string[]>("vault-changed", (e) => {
+        for (const p of e.payload) if (!isOurs(p)) pending.add(p);
+        if (!pending.size) return;
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          const list = [...pending];
+          pending.clear();
+          onChange(list);
+        }, 300);
+      });
+      return () => { clearTimeout(timer); un(); };
+    },
+    close: () => void invoke("vault_close"),
   };
 }
 

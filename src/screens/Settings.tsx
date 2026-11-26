@@ -1,10 +1,10 @@
 import { useState } from "react";
 import type { MoneySource, Settings as S, Sponsor, ThemeName } from "../lib/types";
 import { slugify } from "../lib/util";
-import { useApp } from "../state/AppState";
-import { EditCell, Field } from "../ui/bits";
-import { Header, ProjectModal } from "../ui/Shell";
-import { MemoryFS } from "../vault/fs";
+import { useApp } from "../store";
+import { EditCell, Field } from "../components/bits";
+import { Header, ProjectModal } from "../components/Shell";
+import { MemoryFS } from "../lib/fs";
 
 export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
   const { data, saveSettings, saveSponsor, fs, reload, projectBySlug, project, money } = useApp();
@@ -27,6 +27,7 @@ export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
           <div className="toolbar">
             <button className="btn" onClick={onSwitchVault}>{fs.kind === "desktop" ? "Open a different vault folder…" : "Back to the start screen"}</button>
             <button className="btn" onClick={() => void reload()}>Reload from disk</button>
+            {fs.kind === "desktop" && <span className="small muted">Edits you make in other apps show up straight away.</span>}
             {fs.kind === "browser" && (
               <button className="btn danger" onClick={() => { if (confirm("Erase the browser demo vault?")) { MemoryFS.clearLocalStorage(); location.reload(); } }}>
                 Erase demo data

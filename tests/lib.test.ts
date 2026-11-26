@@ -1,6 +1,6 @@
-import { budgetFromCSV, budgetToCSV, budgetToManyApplyCSV, expenseActuals, incomeActuals } from "./budget";
-import { parseFrontmatter, stringifyFrontmatter } from "./files";
-import { buildForecast } from "./forecast";
+import { budgetFromCSV, budgetToCSV, budgetToManyApplyCSV, expenseActuals, incomeActuals } from "../src/lib/budget";
+import { parseFrontmatter, stringifyFrontmatter } from "../src/lib/files";
+import { buildForecast } from "../src/lib/forecast";
 import {
   earnedIncomeNote,
   ledgerFromCSV,
@@ -10,13 +10,13 @@ import {
   sponsorFeeEntry,
   totals,
   upsertWithFees,
-} from "./ledger";
-import { groupOf, ledgerEntryForPayment, paymentsFromMd, paymentsToICS, paymentsToMd } from "./payments";
-import { FISCAL_TAG, type LedgerEntry, type Payment, type Project, type Sponsor } from "./types";
-import { allocValid, formatAlloc, parseAlloc, shareOf, slugify, weekStart } from "./util";
-import { loadVault } from "../vault/store";
-import { MemoryFS } from "../vault/fs";
-import { sampleVault } from "../vault/seed";
+} from "../src/lib/ledger";
+import { groupOf, ledgerEntryForPayment, paymentsFromMd, paymentsToICS, paymentsToMd } from "../src/lib/payments";
+import { FISCAL_TAG, type LedgerEntry, type Payment, type Project, type Sponsor } from "../src/lib/types";
+import { allocValid, formatAlloc, parseAlloc, shareOf, slugify, weekStart } from "../src/lib/util";
+import { loadVault, personToMd } from "../src/lib/vault";
+import { MemoryFS } from "../src/lib/fs";
+import { sampleVault } from "../src/lib/seed";
 
 const sponsors: Sponsor[] = [
   { slug: "fa", name: "Fractured Atlas", fee_rate: 0.08, fee_applies_to: "", contact: "", account_url: "", review_required_for: [], report_schedule: "", notes: "" },
@@ -194,5 +194,41 @@ describe("sample vault + forecast", () => {
     const likely = buildForecast({ ...{ today, weeks: 26, cushion: 0, sources: v.settings.money_sources, ledger: v.ledger, payments: Object.values(v.payments).flat(), budgets: v.budgets, projects: v.projects, sponsors: v.sponsors, fmt: String }, scenario: "likely" });
     expect(likely.weeks.flatMap((w) => w.items).some((i) => i.confidence === "Likely")).toBe(true);
     expect(f.unscheduled.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Many Apply compatibility", () => {
+  it("reads Expense/Income/In-kind types and skips totals rows", () => {
+    const csv = [
+      "category,type,line_item,quantity,rate,amount,notes",
+      "Design,Expense,Set design,1,800,800,",
+      "In-kind,In-kind,Donated lumber,1,300,300,",
+      "Grants,Income,Arts council,1,2000,2000,",
+      ",,Total expenses,,,800,",
+      ",,Gap,,,-1500,",
+    ].join("\n");
+    const lines = budgetFromCSV(csv);
+    expect(lines.map((l) => l.type)).toEqual(["expense", "in-kind", "income"]);
+    const out = budgetToManyApplyCSV(lines).split("\n");
+    expect(out[1]).toBe("Design,Expense,Set design,1,800,800,");
+    expect(out[2]).toContain(",In-kind,");
+  });
+
+  it("never puts in-kind lines in the cash forecast", async () => {
+    const today = "2026-11-26";
+    const fs = new MemoryFS(sampleVault(today));
+    const v = await loadVault(fs);
+    v.budgets.prodigy.push({ ...v.budgets.prodigy[0], id: "ik", type: "in-kind", category: "In-kind", line_item: "Donated lights", amount: 900, expected_date: "2026-12-10", confidence: "Confirmed" });
+    const f = buildForecast({ today, weeks: 12, scenario: "likely", cushion: 0, sources: v.settings.money_sources, ledger: v.ledger, payments: Object.values(v.payments).flat(), budgets: v.budgets, projects: v.projects, sponsors: v.sponsors, fmt: String });
+    expect(f.weeks.flatMap((w) => w.items).some((i) => i.label === "Donated lights")).toBe(false);
+  });
+
+  it("keeps frontmatter keys the app doesn't know about", async () => {
+    const fs = new MemoryFS(sampleVault("2026-11-26"));
+    await fs.write("people/ana-reyes.md", (await fs.read("people/ana-reyes.md"))!.replace("---\n", "---\nobsidian_tag: favorite\n"));
+    const v = await loadVault(fs);
+    const ana = v.people.find((p) => p.slug === "ana-reyes")!;
+    expect(ana.extra).toEqual({ obsidian_tag: "favorite" });
+    expect(personToMd({ ...ana, phone: "555" })).toContain("obsidian_tag: favorite");
   });
 });

@@ -1,0 +1,162 @@
+import { useEffect, useState } from "react";
+import type { VaultData } from "./lib/types";
+import { Bookkeeping } from "./screens/Bookkeeping";
+import { Budget } from "./screens/Budget";
+import { Dashboard } from "./screens/Dashboard";
+import { Payments } from "./screens/Payments";
+import { Collaborators, Venues } from "./screens/People";
+import { Placeholder } from "./screens/Placeholder";
+import { Settings } from "./screens/Settings";
+import { AppProvider, useApp } from "./state/AppState";
+import { Drawer } from "./ui/Drawer";
+import { CommandPalette, NAV, Sidebar, Toasts } from "./ui/Shell";
+import { isTauri, MemoryFS, openDesktopVault, type VaultFS } from "./vault/fs";
+import { sampleVault } from "./vault/seed";
+import { loadVault } from "./vault/store";
+
+const LAST_VAULT = "many-produce:last-vault";
+
+function lsGet(k: string): string | null {
+  try { return localStorage.getItem(k); } catch { return null; }
+}
+function lsSet(k: string, v: string | null) {
+  try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* ignore */ }
+}
+
+export default function App() {
+  const [vault, setVault] = useState<{ fs: VaultFS; data: VaultData } | null>(null);
+  const [booting, setBooting] = useState(true);
+  const [error, setError] = useState("");
+
+  const open = async (fs: VaultFS) => {
+    try {
+      const data = await loadVault(fs);
+      setVault({ fs, data });
+      if (fs.kind === "desktop") lsSet(LAST_VAULT, fs.root);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      if (isTauri()) {
+        const last = lsGet(LAST_VAULT);
+        if (last) await open(await openDesktopVault(last)).catch(() => lsSet(LAST_VAULT, null));
+      } else {
+        const saved = MemoryFS.fromLocalStorage();
+        if (saved) await open(saved);
+      }
+      setBooting(false);
+    })();
+  }, []);
+
+  if (booting) return null;
+  if (!vault) return <Welcome onOpen={open} error={error} />;
+  return (
+    <AppProvider fs={vault.fs} initial={vault.data} key={vault.fs.root}>
+      <Frame onSwitchVault={() => { lsSet(LAST_VAULT, null); setVault(null); }} />
+    </AppProvider>
+  );
+}
+
+function Welcome({ onOpen, error }: { onOpen: (fs: VaultFS) => void; error: string }) {
+  const desktop = isTauri();
+  const pickFolder = async (withSample: boolean) => {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const dir = await open({ directory: true, title: withSample ? "Choose an empty folder for the sample vault" : "Choose or create your Many Produce folder" });
+    if (typeof dir !== "string") return;
+    const fs = await openDesktopVault(dir);
+    if (withSample) {
+      const existing = await fs.list("");
+      if (existing.length && !confirm("That folder isn't empty. Add sample files to it anyway?")) return;
+      for (const [path, text] of Object.entries(sampleVault())) await fs.write(path, text);
+    }
+    onOpen(fs);
+  };
+  const browser = (withSample: boolean) => {
+    const fs = new MemoryFS(withSample ? sampleVault() : {}, true);
+    fs.enablePersist();
+    onOpen(fs);
+  };
+  return (
+    <div className="welcome">
+      <img src="/icon.svg" alt="" />
+      <h1 style={{ fontSize: 30 }}>Many Produce</h1>
+      <p className="muted">Run a production in one place: the people, the spaces, the money. Everything lives in a folder on your computer as plain markdown and CSV files you own. No accounts, no cloud, no AI.</p>
+      {desktop ? (
+        <div className="toolbar" style={{ justifyContent: "center" }}>
+          <button className="btn primary" onClick={() => pickFolder(false)}>Choose a vault folder…</button>
+          <button className="btn" onClick={() => pickFolder(true)}>Try with sample data…</button>
+        </div>
+      ) : (
+        <>
+          <div className="toolbar" style={{ justifyContent: "center" }}>
+            <button className="btn primary" onClick={() => browser(true)}>Try with sample data</button>
+            <button className="btn" onClick={() => browser(false)}>Start empty</button>
+          </div>
+          <p className="small muted">You&apos;re in the browser demo. Data stays in this browser only. The desktop app saves to a real folder.</p>
+        </>
+      )}
+      {error && <p className="neg">{error}</p>}
+    </div>
+  );
+}
+
+function useTheme() {
+  const { data } = useApp();
+  const t = data.settings.theme;
+  useEffect(() => {
+    const apply = () => {
+      const dark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.theme = t === "system" ? (dark ? "dark" : "light") : t;
+    };
+    apply();
+    if (t !== "system") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [t]);
+}
+
+function Frame({ onSwitchVault }: { onSwitchVault: () => void }) {
+  const { screen, drawer, openDrawer, fireNewItem } = useApp();
+  const [sidebar, setSidebar] = useState(true);
+  const [palette, setPalette] = useState(false);
+  useTheme();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      const k = e.key.toLowerCase();
+      if (k === "k" || k === "f") { e.preventDefault(); setPalette(true); }
+      else if (k === "n") { e.preventDefault(); fireNewItem(); }
+      else if (k === "\\") { e.preventDefault(); setSidebar((s) => !s); }
+      else if (k === ".") { e.preventDefault(); if (drawer) openDrawer(null); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawer, openDrawer, fireNewItem]);
+
+  const phase = NAV.find((n) => n.id === screen)?.phase;
+  let body;
+  if (phase) body = <Placeholder screen={screen} />;
+  else if (screen === "dashboard") body = <Dashboard />;
+  else if (screen === "bookkeeping") body = <Bookkeeping />;
+  else if (screen === "budget") body = <Budget />;
+  else if (screen === "payments") body = <Payments />;
+  else if (screen === "collaborators") body = <Collaborators />;
+  else if (screen === "venues") body = <Venues />;
+  else body = <Settings onSwitchVault={onSwitchVault} />;
+
+  return (
+    <div className={`app${sidebar ? "" : " sidebar-hidden"}`}>
+      <Sidebar />
+      <main className="main">{body}</main>
+      <Drawer />
+      <Toasts />
+      {palette && <CommandPalette onClose={() => setPalette(false)} />}
+    </div>
+  );
+}

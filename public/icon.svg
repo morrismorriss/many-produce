@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="224" fill="#FAD4D4"/>
+  <g transform="translate(512 540)">
+    <rect x="-200" y="-270" width="400" height="520" rx="36" fill="#BFE0F5" transform="rotate(-24)"/>
+    <rect x="-200" y="-270" width="400" height="520" rx="36" fill="#F7B7CC" transform="rotate(-12)"/>
+    <g>
+      <rect x="-200" y="-270" width="400" height="520" rx="36" fill="#FFFFFF"/>
+      <rect x="-200" y="-270" width="400" height="84" rx="36" fill="#EE8AAE"/>
+      <rect x="-200" y="-222" width="400" height="36" fill="#EE8AAE"/>
+      <rect x="-140" y="-140" width="280" height="22" rx="11" fill="#E4E7EE"/>
+      <rect x="-140" y="-90" width="240" height="22" rx="11" fill="#E4E7EE"/>
+      <rect x="-140" y="-40" width="260" height="22" rx="11" fill="#E4E7EE"/>
+      <rect x="-140" y="10" width="180" height="22" rx="11" fill="#E4E7EE"/>
+      <path d="M-140 150 q30 -60 60 0 t60 0 t50 -10" stroke="#4A90C8" stroke-width="14" fill="none" stroke-linecap="round"/>
+      <circle cx="110" cy="150" r="52" fill="#EE8AAE"/>
+      <path d="M86 150 l18 18 l32 -36" stroke="#fff" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

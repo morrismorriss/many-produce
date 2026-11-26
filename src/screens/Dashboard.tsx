@@ -1,0 +1,303 @@
+import { useMemo, useState } from "react";
+import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { expenseActuals, incomeActuals, summarize } from "../lib/budget";
+import { buildForecast, forecastToCSV, type ForecastItem, type LowPoint, type Scenario } from "../lib/forecast";
+import { groupOf } from "../lib/payments";
+import type { Payment } from "../lib/types";
+import { addDays, allocTouches, fmtDate, round2, shareOf } from "../lib/util";
+import { useApp } from "../state/AppState";
+import { Modal, Progress, ProjectTag, Tile, saveTextFile } from "../ui/bits";
+import { Header } from "../ui/Shell";
+import { PaymentModal } from "./Payments";
+
+export function Dashboard() {
+  const app = useApp();
+  const { data, project, today, money, allPayments, saveSettings, setScreen, openDrawer, saveBudget } = app;
+  const [scenario, setScenario] = useState<Scenario>("confirmed");
+  const [low, setLow] = useState<LowPoint | null>(null);
+  const [editPayment, setEditPayment] = useState<Payment | null>(null);
+  const [schedule, setSchedule] = useState<Partial<Payment> | null>(null);
+  const weeks = data.settings.forecast_weeks;
+
+  const f = useMemo(
+    () =>
+      buildForecast({
+        today, weeks, project, scenario, cushion: data.settings.cushion, sources: data.settings.money_sources,
+        ledger: data.ledger, payments: allPayments, budgets: data.budgets, projects: data.projects, sponsors: data.sponsors,
+        fmt: (n) => money(n),
+      }),
+    [today, weeks, project, scenario, data, allPayments, money],
+  );
+
+  const budgets = useMemo(
+    () =>
+      data.projects
+        .filter((p) => !project || p.slug === project)
+        .map((p) => {
+          const lines = data.budgets[p.slug] ?? [];
+          return { p, sum: summarize(expenseActuals(lines, data.ledger, p.slug), incomeActuals(lines, data.ledger, p, data.sponsors)) };
+        }),
+    [data, project],
+  );
+  const stillToPay = budgets.reduce((s, b) => s + b.sum.stillToPay, 0);
+  const raised = budgets.reduce((s, b) => s + b.sum.incomeRaised, 0);
+  const goal = budgets.reduce((s, b) => s + b.sum.incomeProjected, 0);
+
+  const payments = allPayments.filter((p) => allocTouches(p.project_alloc, project));
+  const overdue = payments.filter((p) => groupOf(p, today) === "Overdue");
+
+  // People paid (in the ledger) with no W-9 on file.
+  const noW9 = data.people.filter(
+    (person) => !person.w9_on_file && data.ledger.some((e) => e.kind === "expense" && e.counterparty === person.name && allocTouches(e.project_alloc, project)),
+  );
+
+  const week = payments
+    .filter((p) => p.status === "scheduled" && p.due >= today && p.due <= addDays(today, 7))
+    .sort((a, b) => a.due.localeCompare(b.due));
+
+  // Chart rows
+  const rows = f.weeks.map((w) => ({
+    name: fmtDate(w.start),
+    in: w.moneyIn,
+    out: -w.moneyOut,
+    balance: w.balance,
+    low: w.low.length > 0,
+    w,
+  }));
+  const firstLowPerSource = dedupeLows(f.lowPoints);
+
+  return (
+    <>
+      <Header title="Dashboard" />
+      <div className="content">
+        <div className="tiles">
+          <Tile label="Cash on hand" value={<span className={f.startTotal < 0 ? "neg" : ""}>{money(f.startTotal)}</span>} sub={project ? "This project's net so far" : "All money sources"} />
+          <Tile label="Still to pay" value={money(stillToPay)} sub="Budgeted, not yet paid" />
+          <Tile label="Income raised" value={<span className="in">{money(raised)}</span>} sub={`of ${money(goal)} goal`} />
+          <Tile label="Payments overdue" value={overdue.length} alert={overdue.length > 0} sub={overdue.length ? money(overdue.reduce((s, p) => s + p.amount * shareOf(p.project_alloc, project), 0)) : "All caught up"} />
+          <Tile label="Paperwork missing" value={noW9.length} alert={noW9.length > 0} sub="W-9s for people paid" />
+        </div>
+
+        <section className="card" aria-label="Cash flow forecast">
+          <div className="card-head">
+            <h2>Cash flow forecast</h2>
+            <span className="muted small">Starting balance {money(f.startTotal)}</span>
+            <div className="spacer" />
+            <div className="seg" role="group" aria-label="Scenario">
+              <button aria-pressed={scenario === "confirmed"} onClick={() => setScenario("confirmed")}>Confirmed only</button>
+              <button aria-pressed={scenario === "likely"} onClick={() => setScenario("likely")}>Including likely</button>
+            </div>
+            <div className="seg" role="group" aria-label="Weeks">
+              {([6, 12, 26] as const).map((n) => (
+                <button key={n} aria-pressed={weeks === n} onClick={() => void saveSettings({ ...data.settings, forecast_weeks: n })}>{n} wk</button>
+              ))}
+            </div>
+            <button className="btn small" onClick={() => saveTextFile("cash-flow-forecast.csv", forecastToCSV(f), "text/csv")}>CSV</button>
+          </div>
+
+          {firstLowPerSource.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+              {firstLowPerSource.map((l) => (
+                <button key={l.week + l.source} className="lowpoint" onClick={() => setLow(l)}>
+                  <span aria-hidden>▼</span>
+                  <span><strong>Week of {fmtDate(l.week)}:</strong> {l.message} <u>See what’s causing it</u></span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div style={{ width: "100%", height: 300 }}>
+            <ResponsiveContainer>
+              <ComposedChart data={rows} margin={{ top: 10, right: 10, left: 10, bottom: 0 }} stackOffset="sign">
+                <CartesianGrid stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: "var(--muted)", fontSize: 11 }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
+                <YAxis tick={{ fill: "var(--muted)", fontSize: 11 }} tickFormatter={(v) => money(v)} axisLine={false} tickLine={false} width={70} />
+                <Tooltip content={<WeekTip money={money} />} />
+                <ReferenceLine y={0} stroke="var(--muted)" />
+                {data.settings.cushion > 0 && <ReferenceLine y={data.settings.cushion} stroke="var(--danger)" strokeDasharray="4 4" label={{ value: "Cushion", fill: "var(--danger)", fontSize: 11, position: "insideTopRight" }} />}
+                <Bar dataKey="in" name="Money in" fill="var(--secondary)" radius={[4, 4, 0, 0]} stackId="s" />
+                <Bar dataKey="out" name="Money out" fill="var(--primary)" radius={[0, 0, 4, 4]} stackId="s" />
+                <Line
+                  dataKey="balance"
+                  name="Balance"
+                  stroke="var(--text)"
+                  strokeWidth={2}
+                  dot={(props: { cx?: number; cy?: number; payload?: { low: boolean }; index?: number }) =>
+                    props.payload?.low ? <circle key={props.index} cx={props.cx} cy={props.cy} r={5} fill="var(--danger)" stroke="var(--bg)" strokeWidth={2} /> : <circle key={props.index} cx={props.cx} cy={props.cy} r={2.5} fill="var(--text)" />
+                  }
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="chips small muted" style={{ marginTop: 6 }}>
+            <span><span className="tag" style={{ background: "var(--secondary)", color: "#fff" }}>Money in</span></span>
+            <span><span className="tag" style={{ background: "var(--primary)", color: "#fff" }}>Money out</span></span>
+            <span><span className="tag">— Balance (red dot = low point)</span></span>
+          </div>
+
+          {f.unscheduled.length > 0 && (
+            <details style={{ marginTop: 12 }}>
+              <summary className="muted">
+                Unscheduled budget: {money(f.unscheduled.reduce((s, u) => s + u.amount, 0))} across {f.unscheduled.length} lines (not in the chart until scheduled)
+              </summary>
+              <table className="t" style={{ marginTop: 8 }}>
+                <tbody>
+                  {f.unscheduled.map((u) => (
+                    <tr key={u.project + u.line.id}>
+                      <td>{u.line.line_item}</td>
+                      <td><ProjectTag slug={u.project} /></td>
+                      <td className="muted">{u.line.category}</td>
+                      <td className="r num">{money(u.amount)}</td>
+                      <td className="r">
+                        <button className="btn small" onClick={() => setSchedule({ title: u.line.line_item, amount: round2(u.amount), budget_line: u.line.id, category: u.line.category, project_alloc: { [u.project]: 1 } })}>
+                          Schedule…
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          )}
+        </section>
+
+        <div className="grid-2" style={{ marginTop: 14 }}>
+          <section className="card" aria-label="Needs attention">
+            <div className="card-head"><h2>Needs attention</h2></div>
+            <ul className="attn">
+              {overdue.map((p) => (
+                <li key={p.id}>
+                  <span className="pill red">Overdue</span>
+                  <span>{p.title} · {money(p.amount)} · due {fmtDate(p.due)}</span>
+                  <button className="btn small" onClick={() => { setScreen("payments"); openDrawer({ kind: "payment", id: p.id }); }}>Open</button>
+                </li>
+              ))}
+              {noW9.map((p) => (
+                <li key={p.slug}>
+                  <span className="pill amber">No W-9</span>
+                  <span>{p.name} has been paid but has no W-9 on file</span>
+                  <button className="btn small" onClick={() => { setScreen("collaborators"); openDrawer({ kind: "person", slug: p.slug }); }}>Open</button>
+                </li>
+              ))}
+              {firstLowPerSource.map((l) => (
+                <li key={"l" + l.week + l.source}>
+                  <span className="pill red">Low point</span>
+                  <span>Week of {fmtDate(l.week)}: {l.source || "Total"} {money(l.balance)}</span>
+                  <button className="btn small" onClick={() => setLow(l)}>Fix</button>
+                </li>
+              ))}
+              {!overdue.length && !noW9.length && !firstLowPerSource.length && <li className="muted">Nothing needs attention. Nice.</li>}
+            </ul>
+            <p className="small muted" style={{ marginTop: 10 }}>Contracts, COIs, timeline tasks, reimbursements and reports join this list as those screens are built.</p>
+          </section>
+
+          <section className="card" aria-label="This week">
+            <div className="card-head"><h2>This week</h2></div>
+            {week.length ? (
+              <ul className="attn">
+                {week.map((p) => (
+                  <li key={p.id}>
+                    <span className="pill pink">Payment</span>
+                    <span>{fmtDate(p.due)} · {p.title} · {money(p.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">Nothing due in the next 7 days.</p>
+            )}
+          </section>
+        </div>
+
+        <section className="card" style={{ marginTop: 14 }} aria-label="Budget snapshot">
+          <div className="card-head"><h2>Budget snapshot</h2><span className="muted small">Paid vs. budgeted</span></div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {budgets.filter((b) => b.sum.total > 0).map((b) => (
+              <div key={b.p.slug} style={{ display: "grid", gridTemplateColumns: "200px 1fr 180px", gap: 12, alignItems: "center" }}>
+                <ProjectTag slug={b.p.slug} />
+                <Progress value={b.sum.paid} max={b.sum.total} />
+                <span className="small num">{money(b.sum.paid)} of {money(b.sum.total)}</span>
+              </div>
+            ))}
+            {!budgets.some((b) => b.sum.total > 0) && <p className="muted">No budgets yet.</p>}
+          </div>
+        </section>
+      </div>
+
+      {low && (
+        <LowPointModal
+          low={low}
+          onClose={() => setLow(null)}
+          onMovePayment={(id) => { const p = allPayments.find((x) => x.id === id); if (p) { setLow(null); setEditPayment(p); } }}
+          onSooner={(item) => {
+            const lines = data.budgets[item.ref.project] ?? [];
+            const nd = prompt("Expected date (YYYY-MM-DD)", item.date);
+            if (nd && /^\d{4}-\d{2}-\d{2}$/.test(nd)) void saveBudget(item.ref.project, lines.map((l) => (l.id === item.ref.id ? { ...l, expected_date: nd } : l)));
+            setLow(null);
+          }}
+          laterIncome={f.weeks.flatMap((w) => w.items).filter((i) => i.amount > 0 && (!low.source || i.source === low.source) && i.date >= low.week)}
+        />
+      )}
+      {editPayment && <PaymentModal existing={editPayment} onClose={() => setEditPayment(null)} />}
+      {schedule && <PaymentModal preset={schedule} onClose={() => setSchedule(null)} />}
+    </>
+  );
+}
+
+function dedupeLows(lows: LowPoint[]): LowPoint[] {
+  const seen = new Set<string>();
+  return lows.filter((l) => (seen.has(l.source) ? false : (seen.add(l.source), true)));
+}
+
+function WeekTip({ active, payload, money }: { active?: boolean; payload?: { payload: { w: { start: string; balance: number; items: ForecastItem[]; moneyIn: number; moneyOut: number } } }[]; money: (n: number, o?: { sign?: boolean }) => string }) {
+  if (!active || !payload?.length) return null;
+  const w = payload[0].payload.w;
+  return (
+    <div className="card" style={{ boxShadow: "var(--shadow)", minWidth: 240, fontSize: 12 }}>
+      <strong>Week of {fmtDate(w.start, true)}</strong>
+      <div className="muted">In {money(w.moneyIn)} · Out {money(w.moneyOut)} · Balance {money(w.balance)}</div>
+      {w.items.length ? (
+        <ul style={{ margin: "6px 0 0", paddingLeft: 16 }}>
+          {w.items.map((i, k) => (
+            <li key={k}>
+              <span className={i.amount > 0 ? "in" : ""}>{money(i.amount, { sign: true })}</span> {i.label} <span className="muted">· {i.source}{i.confidence ? ` · ${i.confidence}` : ""}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="muted">Nothing scheduled</div>
+      )}
+    </div>
+  );
+}
+
+function LowPointModal({ low, onClose, onMovePayment, onSooner, laterIncome }: { low: LowPoint; onClose: () => void; onMovePayment: (id: string) => void; onSooner: (i: ForecastItem) => void; laterIncome: ForecastItem[] }) {
+  const { money } = useApp();
+  return (
+    <Modal title={`Low point · week of ${fmtDate(low.week, true)}`} onClose={onClose}>
+      <p className="neg">{low.message}</p>
+      <h3>Money going out that week</h3>
+      <ul className="attn">
+        {low.causes.map((c) => (
+          <li key={c.ref.id}>
+            <span>{fmtDate(c.date)} · {c.label} · {money(c.amount)}</span>
+            <button className="btn small" onClick={() => onMovePayment(c.ref.id)}>Move due date</button>
+          </li>
+        ))}
+        {!low.causes.length && <li className="muted">No single payment that week; the balance was already low.</li>}
+      </ul>
+      {laterIncome.length > 0 && (
+        <>
+          <h3>Expected income after it</h3>
+          <ul className="attn">
+            {laterIncome.slice(0, 5).map((i) => (
+              <li key={i.ref.id + i.date}>
+                <span>{fmtDate(i.date)} · {i.label} · <span className="in">{money(i.amount, { sign: true })}</span> <span className="muted">({i.confidence})</span></span>
+                <button className="btn small" onClick={() => onSooner(i)}>Expect sooner…</button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </Modal>
+  );
+}

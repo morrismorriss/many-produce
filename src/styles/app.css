@@ -317,3 +317,24 @@ table.t tr.milestone td { background: var(--surface); font-size: 13px; }
 .g-ms { position: absolute; top: 12px; transform: translateX(-6px); font-size: 13px; color: var(--primary); cursor: default; }
 .g-ms.g-payment { color: var(--secondary); }
 .g-ms.g-paperwork { color: var(--warning); }
+
+/* ---- shopping ---- */
+.buyer { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.buyer-producer { background: var(--text); color: var(--bg); }
+.buyer-designer { background: var(--primary-soft); color: var(--primary); }
+.buyer-other { background: var(--secondary-soft); color: var(--secondary); }
+.buyer-unassigned { border: 1px dashed var(--danger); color: var(--danger); }
+.buyer-select { position: relative; display: inline-flex; cursor: pointer; }
+.buyer-select select { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.buyer-select:focus-within .buyer { outline: 2px solid var(--focus); outline-offset: 2px; }
+.table-scroll { overflow-x: auto; }
+table.shopping td:nth-child(2) .cell-edit { min-width: 210px; }
+table.shopping input[type="number"] { width: 76px; }
+.cell-edit[type="number"] { min-width: 0; }
+table.shopping select[aria-label="Money"] { min-width: 120px; }
+table.shopping .where { display: flex; align-items: center; gap: 6px; }
+table.shopping .where .cell-edit { font-size: 12px; color: var(--muted); padding-top: 0; padding-bottom: 0; }
+table.shopping input[type="date"] { width: 132px; }
+table.shopping td.actions { min-width: 120px; }
+table.shopping td.actions > * { margin: 2px 0 2px 4px; }
+table.shopping select[aria-label="Department"] { min-width: 118px; }

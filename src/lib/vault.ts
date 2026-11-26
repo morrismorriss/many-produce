@@ -21,6 +21,9 @@ import { docFromMd, docToMd, issuedFromCSV, issuedToCSV, templateFromMd, templat
 import { STARTER_TEMPLATES } from "./starterTemplates";
 import type { Conflict, Issued1099, PaperDoc, Scene, ScheduleEvent, Template, TimelineTask, TimelineTemplate } from "./types";
 import { conflictsFromCSV, conflictsToCSV, eventsFromCSV, eventsToCSV, scenesFromCSV, scenesToCSV } from "./schedule";
+import { shoppingFromCSV, shoppingToCSV } from "./shopping";
+import { checkoutsFromCSV, checkoutsToCSV, itemsFromCSV, itemsToCSV } from "./inventory";
+import type { Checkout, InventoryItem, ShoppingItem } from "./types";
 import { STARTER_TIMELINE_TEMPLATES, timelineFromMd, timelineTemplateFromMd, timelineTemplateToMd, timelineToMd } from "./timeline";
 
 export const SETTINGS_PATH = ".manyproduce/settings.json";
@@ -217,6 +220,7 @@ export async function loadVault(fs: VaultFS): Promise<VaultData> {
   await initVault(fs);
   const projects: Project[] = [];
   const budgets: Record<string, BudgetLine[]> = {};
+  const shopping: Record<string, ShoppingItem[]> = {};
   const payments: Record<string, Payment[]> = {};
   for (const e of await fs.list("projects")) {
     if (!e.is_dir) continue;
@@ -227,6 +231,7 @@ export async function loadVault(fs: VaultFS): Promise<VaultData> {
     p.slug = e.name; // folder name is the source of truth
     projects.push(p);
     budgets[p.slug] = budgetFromCSV((await fs.read(`projects/${p.slug}/budget.csv`)) ?? "");
+    shopping[p.slug] = shoppingFromCSV(p.slug, (await fs.read(`projects/${p.slug}/shopping.csv`)) ?? "");
     payments[p.slug] = paymentsFromMd((await fs.read(`projects/${p.slug}/payments.md`)) ?? "").payments;
   }
   projects.sort((a, b) => Number(!!a.builtin) - Number(!!b.builtin) || a.name.localeCompare(b.name));
@@ -295,7 +300,10 @@ export async function loadVault(fs: VaultFS): Promise<VaultData> {
     timelineTemplates.push(timelineTemplateFromMd(e.name.slice(0, -3), (await fs.read(`timeline/timeline-templates/${e.name}`)) ?? ""));
   }
 
-  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates, events, conflicts, scenes, timelines, timelineTemplates };
+  const inventory: InventoryItem[] = itemsFromCSV((await fs.read("inventory/items.csv")) ?? "");
+  const checkouts: Checkout[] = checkoutsFromCSV((await fs.read("inventory/checkouts.csv")) ?? "");
+
+  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates, events, conflicts, scenes, timelines, timelineTemplates, shopping, inventory, checkouts };
 }
 
 // ---- writers ----
@@ -320,4 +328,7 @@ export const saveConflicts = (fs: VaultFS, c: Conflict[]) => fs.write("schedule/
 export const saveScenes = (fs: VaultFS, project: string, s: Scene[]) => fs.write(`schedule/${project}-scenes.csv`, scenesToCSV(s));
 export const saveTimeline = (fs: VaultFS, project: string, tasks: TimelineTask[]) => fs.write(`timeline/${project}.md`, timelineToMd(tasks));
 export const saveTimelineTemplate = (fs: VaultFS, t: TimelineTemplate) => fs.write(`timeline/timeline-templates/${t.slug}.md`, timelineTemplateToMd(t));
+export const saveShopping = (fs: VaultFS, project: string, items: ShoppingItem[]) => fs.write(`projects/${project}/shopping.csv`, shoppingToCSV(items));
+export const saveInventory = (fs: VaultFS, items: InventoryItem[]) => fs.write("inventory/items.csv", itemsToCSV(items));
+export const saveCheckouts = (fs: VaultFS, c: Checkout[]) => fs.write("inventory/checkouts.csv", checkoutsToCSV(c));
 export const saveSettings = (fs: VaultFS, s: Settings) => fs.write(SETTINGS_PATH, JSON.stringify(s, null, 2));

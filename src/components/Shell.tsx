@@ -4,6 +4,7 @@ import { missingPaperwork } from "../lib/paperwork";
 import type { Project } from "../lib/types";
 import { fmtDate, uniqueSlug } from "../lib/util";
 import { anchorsFor, shiftPreview } from "../lib/timeline";
+import { gearWarnings } from "../lib/inventory";
 import { useApp, type Screen } from "../store";
 import { Field, Modal, Plus } from "./bits";
 
@@ -12,10 +13,10 @@ export const NAV: { id: Screen; label: string; phase?: number }[] = [
   { id: "collaborators", label: "Collaborators" },
   { id: "venues", label: "Venues" },
   { id: "bookkeeping", label: "Bookkeeping" },
-  { id: "shopping", label: "Shopping list", phase: 6 },
+  { id: "shopping", label: "Shopping list" },
   { id: "paperwork", label: "Paperwork" },
   { id: "schedule", label: "Schedule" }, // calendar, availability, scenes and the timeline
-  { id: "inventory", label: "Equipment log", phase: 6 },
+  { id: "inventory", label: "Equipment log" },
   { id: "campaigns", label: "Campaigns", phase: 7 },
   { id: "templates", label: "Templates", phase: 7 },
   { id: "reports", label: "Reports", phase: 8 },
@@ -58,6 +59,8 @@ export function Sidebar() {
       bookkeeping: overdue ? { text: `${overdue} overdue`, alert: true } : ledger ? { text: String(ledger) } : undefined,
       collaborators: people ? { text: String(people) } : undefined,
       paperwork: (() => { const n = missingPaperwork(data, project, today).length; return n ? { text: `${n} missing`, alert: true } : undefined; })(),
+      shopping: (() => { const n = Object.values(data.shopping).flat().filter((i) => (!project || i.project === project) && i.status === "Needed").length; return n ? { text: `${n} to get` } : undefined; })(),
+      inventory: (() => { const n = gearWarnings(data.inventory, data.checkouts, data.people, data.projects, (p) => anchorsFor(p, data.events).closing, today, project).length; return n ? { text: `${n} overdue`, alert: true } : undefined; })(),
       venues: data.venues.length ? { text: String(data.venues.filter((v) => !project || v.projects.includes(project)).length) } : undefined,
     };
   }, [allPayments, data, project, today, people]);

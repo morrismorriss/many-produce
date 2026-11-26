@@ -9,6 +9,7 @@ Many Produce/
       project.md        # project settings (frontmatter) + notes (body)
       budget.csv        # budget lines
       payments.md       # scheduled and paid payments (frontmatter list)
+      shopping.csv      # the show's shopping list
     overhead/           # built in: Company overhead, can't be deleted
   ledger/
     2026.csv            # every income and expense entry, one file per year
@@ -25,6 +26,9 @@ Many Produce/
     <project>.csv         # rehearsals, tech, performances, meetings
     <project>-scenes.csv  # scene breakdown (who's in each scene)
     conflicts.csv         # each person's unavailable dates and times
+  inventory/
+    items.csv             # Equipment log items (owned, borrowed, rented)
+    checkouts.csv         # who has what, when it's due back, condition out/in
   timeline/
     <project>.md          # milestones and tasks, relative to opening
     timeline-templates/<slug>.md
@@ -213,6 +217,33 @@ tasks:
 ```
 
 Anchors are `start`, `first_rehearsal`, `tech`, `opening`, `closing` and `end`. They come from the project's dates, or from the Schedule (the first rehearsal or read-through, the first tech, and the first and last performances). Timeline templates in `timeline/timeline-templates/` use the same task format, with `title` and `description`.
+
+## projects/&lt;slug&gt;/shopping.csv
+
+```
+id,item,where,link,department,buyer,buyer_role,need_by,est_cost,actual_cost,money,status,receipt,notes,payment_id,ledger_id,inventory_id
+```
+
+- `buyer` is `producer`, a person slug, or blank (unassigned). `buyer_role` is `producer`, `designer`, `other` or `unassigned`.
+- `money` is `Producer card`, `Reimburse`, `In-kind`, `Paid by venue`, or the name of a sponsor-fund money source.
+- `status` is `Needed`, `Got it` or `Reimbursed`.
+- `payment_id` points at the reimbursement payment, and the payment carries `shopping_item` back. `ledger_id` points at the expense entry for something you paid for directly. `inventory_id` is set once the item moves into the Equipment log.
+
+## inventory/items.csv
+
+```
+id,name,category,owner,project,serial,value,rental_house,rental_order,rental_cost,rental_start,rental_end,deposit,deposit_returned,returned,condition,notes
+```
+
+`owner` is `producer`, `person:<slug>`, `venue:<slug>`, or free text. Rented items have a `rental_house`. Items with the same `rental_order` are shown as one order.
+
+## inventory/checkouts.csv
+
+```
+id,item,person,out_date,due_date,in_date,condition_out,condition_in,notes
+```
+
+A blank `in_date` means it's still out.
 
 ## .manyproduce/settings.json
 

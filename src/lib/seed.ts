@@ -19,6 +19,9 @@ import {
 import { addDays, todayISO } from "./util";
 import { docToMd } from "./paperwork";
 import { conflictsToCSV, eventsToCSV, scenesToCSV } from "./schedule";
+import { shoppingToCSV } from "./shopping";
+import { checkoutsToCSV, itemsToCSV } from "./inventory";
+import type { InventoryItem, ShoppingItem } from "./types";
 import { STARTER_TIMELINE_TEMPLATES, applyTemplate, timelineToMd } from "./timeline";
 import { OVERHEAD_PROJECT, PRESET_SPONSORS, SETTINGS_PATH, personToMd, projectToMd, sponsorToMd, venueToMd } from "./vault";
 
@@ -230,6 +233,38 @@ export function sampleVault(today = todayISO()): Record<string, string> {
   files["timeline/prodigy.md"] = timelineToMd([
     { id: "t-grant", title: "Submit city arts micro-grant", due: d(-2), rel: null, owner: "producer", status: "To do", department: "Fundraising", phase: "", link: "", todoist: false, todoist_task_id: "" },
     ...full,
+  ]);
+
+  // Shopping list
+  const sh = (id: string, project: string, x: Partial<ShoppingItem>): ShoppingItem => ({
+    id, project, item: "", where: "", link: "", department: "Props", buyer: "", buyer_role: "unassigned", need_by: "", est_cost: null, actual_cost: null,
+    money: "Producer card", status: "Needed", receipt: "", notes: "", payment_id: "", ledger_id: "", inventory_id: "", ...x,
+  });
+  files["projects/made-men-reading/shopping.csv"] = shoppingToCSV([
+    sh("sh1", "made-men-reading", { item: "Music stands (5)", where: "Borrow from Maya's school", department: "Stage management", buyer: "dev-okafor", buyer_role: "other", need_by: d(72), money: "In-kind" }),
+    sh("sh2", "made-men-reading", { item: "Script binders + printing", where: "FedEx Office", department: "Stage management", buyer: "producer", buyer_role: "producer", need_by: d(6), est_cost: 60 }),
+    sh("sh3", "made-men-reading", { item: "Pinstripe vest", where: "Village Discount", department: "Costumes", buyer: "maya-ostrowski", buyer_role: "other", need_by: d(70), est_cost: 25, money: "Reimburse" }),
+  ]);
+  files["projects/prodigy/shopping.csv"] = shoppingToCSV([
+    sh("sh4", "prodigy", { item: "Gel swatch book + R80 gel", where: "Grand Stage", department: "Lighting", buyer: "jun-park", buyer_role: "designer", need_by: d(-2), est_cost: 45, actual_cost: 52, money: "Reimburse", status: "Got it" }),
+    sh("sh5", "prodigy", { item: "Vintage rotary phone", where: "eBay", link: "https://www.ebay.com", department: "Props", buyer: "producer", buyer_role: "producer", need_by: d(30), est_cost: 40 }),
+    sh("sh6", "prodigy", { item: "Hazer fluid", where: "", department: "Lighting", need_by: d(200), est_cost: 35 }),
+  ]);
+
+  // Equipment log
+  const it = (id: string, x: Partial<InventoryItem>): InventoryItem => ({
+    id, name: "", category: "Other", owner: "producer", project: "", serial: "", value: null, rental_house: "", rental_order: "", rental_cost: null,
+    rental_start: "", rental_end: "", deposit: null, deposit_returned: false, returned: false, condition: "Good", notes: "", ...x,
+  });
+  files["inventory/items.csv"] = itemsToCSV([
+    it("it1", { name: "Zoom H5 recorder", category: "Sound", serial: "H5-22810", value: 280 }),
+    it("it2", { name: "Studio keys (set 2)", category: "Keys / access", project: "prodigy", owner: "venue:uptown-studio-theatre" }),
+    it("it3", { name: "LED par cans (4)", category: "Lighting", project: "prodigy", rental_house: "Grand Stage Rentals", rental_order: "GS-1182", rental_cost: 120, rental_start: d(-3), rental_end: d(2), deposit: 200 }),
+    it("it4", { name: "Laptop for sound cues", category: "Laptop / hard drives", value: 900, serial: "MBA-2021" }),
+  ]);
+  files["inventory/checkouts.csv"] = checkoutsToCSV([
+    { id: "co1", item: "it1", person: "dev-okafor", out_date: d(-20), due_date: d(-6), in_date: "", condition_out: "Good", condition_in: "", notes: "For recording the read-through" },
+    { id: "co2", item: "it2", person: "ana-reyes", out_date: d(-10), due_date: "", in_date: "", condition_out: "", condition_in: "", notes: "" },
   ]);
 
   // Paperwork

@@ -7,7 +7,9 @@ import type { VaultFS } from "./lib/fs";
 import { removeWithFees, upsertWithFees } from "./lib/ledger";
 import { ledgerEntryForPayment } from "./lib/payments";
 import { newDocPath, paymentsForSchedule } from "./lib/paperwork";
-import type { Conflict, Scene, ScheduleEvent, TimelineTask, TimelineTemplate } from "./lib/types";
+import type { Checkout, Conflict, InventoryItem, Scene, ScheduleEvent, ShoppingItem, TimelineTask, TimelineTemplate } from "./lib/types";
+import { producerPurchaseEntry, reimbursementPayment } from "./lib/shopping";
+import { itemFromShopping } from "./lib/inventory";
 import type { BudgetLine, Issued1099, LedgerEntry, PaperDoc, Payment, Person, Project, Settings, Sponsor, Template, Venue, VaultData } from "./lib/types";
 import { fmtMoney, primaryProject, todayISO, uid } from "./lib/util";
 import * as vault from "./lib/vault";
@@ -78,6 +80,17 @@ interface State {
   saveScenes: (project: string, s: Scene[]) => Promise<void>;
   saveTimeline: (project: string, tasks: TimelineTask[]) => Promise<void>;
   saveTimelineTemplate: (t: TimelineTemplate) => Promise<void>;
+  saveShoppingItem: (i: ShoppingItem) => Promise<void>;
+  deleteShoppingItem: (i: ShoppingItem) => Promise<void>;
+  /** Tick "got it". Producer-paid items get their expense entry; unticking removes it. */
+  setGotIt: (i: ShoppingItem, got: boolean) => Promise<void>;
+  /** Create the reimbursement payment to the buyer (optionally marked paid now). */
+  reimburse: (i: ShoppingItem, opts: { method: string; due: string; paidNow: boolean }) => Promise<void>;
+  moveToEquipment: (i: ShoppingItem) => Promise<void>;
+  saveInventoryItem: (i: InventoryItem) => Promise<void>;
+  deleteInventoryItem: (id: string) => Promise<void>;
+  checkOut: (item: string, person: string, due: string, condition: string) => Promise<void>;
+  checkIn: (checkout: string, condition: string) => Promise<void>;
   reload: (quiet?: boolean) => Promise<void>;
 }
 
@@ -318,6 +331,78 @@ export const useStore = create<State>()((set, get) => {
     saveTimelineTemplate: async (t) => {
       patch((d) => ({ timelineTemplates: upsert(d.timelineTemplates, t, (x) => x.slug) }));
       await vault.saveTimelineTemplate(get().fs, t).catch(fail);
+    },
+
+    saveShoppingItem: async (i) => {
+      const list = upsert(get().data.shopping[i.project] ?? [], i, (x) => x.id);
+      // Moving an item to another project moves it between files.
+      for (const [slug, l] of Object.entries(get().data.shopping)) {
+        if (slug !== i.project && l.some((x) => x.id === i.id)) {
+          const rest = l.filter((x) => x.id !== i.id);
+          patch((d) => ({ shopping: { ...d.shopping, [slug]: rest } }));
+          await vault.saveShopping(get().fs, slug, rest).catch(fail);
+        }
+      }
+      patch((d) => ({ shopping: { ...d.shopping, [i.project]: list } }));
+      await vault.saveShopping(get().fs, i.project, list).catch(fail);
+    },
+    deleteShoppingItem: async (i) => {
+      const list = (get().data.shopping[i.project] ?? []).filter((x) => x.id !== i.id);
+      patch((d) => ({ shopping: { ...d.shopping, [i.project]: list } }));
+      await vault.saveShopping(get().fs, i.project, list).catch(fail);
+      get().toast(`"${i.item}" removed`, () => void get().saveShoppingItem(i));
+    },
+    setGotIt: async (i, got) => {
+      const today = todayISO();
+      if (got) {
+        let next: ShoppingItem = { ...i, status: "Got it", actual_cost: i.actual_cost ?? i.est_cost };
+        const e = producerPurchaseEntry(next, today, get().data.settings.money_sources);
+        if (e && !i.ledger_id) {
+          await get().saveEntry(e);
+          next = { ...next, ledger_id: e.id };
+        }
+        await get().saveShoppingItem(next);
+        if (e) get().toast(`Got it · ${e.description} added to Bookkeeping`);
+      } else {
+        if (i.ledger_id) {
+          const { next, removed } = removeWithFees(get().data.ledger, i.ledger_id);
+          await writeLedger(next, yearsOf(...removed));
+        }
+        await get().saveShoppingItem({ ...i, status: "Needed", ledger_id: "" });
+      }
+    },
+    reimburse: async (i, { method, due, paidNow }) => {
+      const person = get().data.people.find((p) => p.slug === i.buyer);
+      const pay = reimbursementPayment(i, person?.name ?? i.buyer, method, due);
+      await get().savePayment(pay);
+      await get().saveShoppingItem({ ...i, status: "Reimbursed", payment_id: pay.id });
+      if (paidNow) await get().setPaid(pay.id, true);
+      else get().toast(`Reimbursement to ${pay.payee} added to Payments`);
+    },
+    moveToEquipment: async (i) => {
+      const item = itemFromShopping(i);
+      await get().saveInventoryItem(item);
+      await get().saveShoppingItem({ ...i, inventory_id: item.id });
+      get().toast(`"${i.item}" added to the Equipment log`);
+    },
+    saveInventoryItem: async (i) => {
+      patch((d) => ({ inventory: upsert(d.inventory, i, (x) => x.id) }));
+      await vault.saveInventory(get().fs, get().data.inventory).catch(fail);
+    },
+    deleteInventoryItem: async (id) => {
+      const it = get().data.inventory.find((x) => x.id === id);
+      patch((d) => ({ inventory: d.inventory.filter((x) => x.id !== id) }));
+      await vault.saveInventory(get().fs, get().data.inventory).catch(fail);
+      if (it) get().toast(`"${it.name}" removed`, () => void get().saveInventoryItem(it));
+    },
+    checkOut: async (item, person, due, condition) => {
+      const c: Checkout = { id: uid("co"), item, person, out_date: todayISO(), due_date: due, in_date: "", condition_out: condition, condition_in: "", notes: "" };
+      patch((d) => ({ checkouts: [...d.checkouts, c] }));
+      await vault.saveCheckouts(get().fs, get().data.checkouts).catch(fail);
+    },
+    checkIn: async (id, condition) => {
+      patch((d) => ({ checkouts: d.checkouts.map((c) => (c.id === id ? { ...c, in_date: todayISO(), condition_in: condition } : c)) }));
+      await vault.saveCheckouts(get().fs, get().data.checkouts).catch(fail);
     },
 
     reload: async (quiet) => {

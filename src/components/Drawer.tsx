@@ -8,6 +8,8 @@ import { PaymentModal } from "../screens/Payments";
 import { missingPaperwork } from "../lib/paperwork";
 import type { PaperDoc } from "../lib/types";
 import { DocDrawerBody } from "./DocDrawer";
+import { cost, owedTo } from "../lib/shopping";
+import { CheckOutModal } from "../screens/Equipment";
 import { useApp } from "../store";
 import { AllocTags, Initials, ProjectTag, X } from "./bits";
 
@@ -123,6 +125,7 @@ function DrawerContent({ onClose, full, onToggleFull }: { onClose: () => void; f
               <ul className="attn" style={{ marginTop: 6 }}>{upcoming.map((x) => <li key={x.id}>{fmtDate(x.due)} · {x.title} · {money(x.amount)}</li>)}</ul>
             </div>
           )}
+          <StuffSection person={p.slug} />
           <PaperworkSection docs={data.docs.filter((d) => d.people.includes(p.slug))} missing={missingPaperwork(data, "", app.today).filter((m) => m.person === p.slug)} preset={{ people: [p.slug], project: p.projects[0] ?? "" }} draft={{ person: p.slug }} />
           {p.notes && <div><h3>Notes</h3><p style={{ whiteSpace: "pre-wrap" }}>{p.notes}</p></div>}
           <div className="toolbar">
@@ -225,6 +228,48 @@ function PaperworkSection({ docs, missing, preset, draft }: { docs: PaperDoc[]; 
       ) : !missing.length ? <p className="muted small">No documents yet.</p> : null}
       {adding && <DocModal preset={adding} onClose={() => setAdding(null)} />}
       {drafting && <DraftModal preset={draft} onClose={() => setDrafting(false)} />}
+    </div>
+  );
+}
+
+/** What a collaborator is buying, what they're owed, and what they're holding. */
+function StuffSection({ person }: { person: string }) {
+  const { data, allPayments, money, setScreen, checkIn, today } = useApp();
+  const [checkingOut, setCheckingOut] = useState(false);
+  const { buying, owed } = owedTo(person, Object.values(data.shopping).flat(), allPayments);
+  const holding = data.checkouts.filter((c) => c.person === person && !c.in_date);
+  return (
+    <div>
+      <div className="section-title">
+        <h3>Buying and holding</h3>
+        {owed > 0 && <span className="pill amber">Owed {money(owed)}</span>}
+        <button className="btn small" onClick={() => setCheckingOut(true)}>Check out…</button>
+      </div>
+      {buying.length > 0 && (
+        <ul className="attn" style={{ marginBottom: 6 }}>
+          {buying.map((i) => (
+            <li key={i.id} style={{ cursor: "pointer" }} onClick={() => setScreen("shopping")}>
+              <span className={`pill ${i.status === "Needed" ? "" : "green"}`}>{i.status === "Needed" ? "To buy" : i.status}</span>
+              <span>{i.item}</span>
+              <span className="muted small" style={{ marginLeft: "auto" }}>{i.need_by ? `by ${fmtDate(i.need_by)}` : ""} {cost(i) ? money(cost(i)) : ""}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {holding.length > 0 && (
+        <ul className="attn">
+          {holding.map((c) => (
+            <li key={c.id}>
+              <span className={`pill ${c.due_date && c.due_date < today ? "red" : "blue"}`}>Has</span>
+              <span>{data.inventory.find((x) => x.id === c.item)?.name ?? c.item}</span>
+              <span className="muted small">{c.due_date ? `back ${fmtDate(c.due_date)}` : ""}</span>
+              <button className="btn small" style={{ marginLeft: "auto" }} onClick={() => void checkIn(c.id, c.condition_out)}>Check in</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!buying.length && !holding.length && <p className="muted small">Not buying anything or holding any gear.</p>}
+      {checkingOut && <CheckOutModal person={person} onClose={() => setCheckingOut(false)} />}
     </div>
   );
 }

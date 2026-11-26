@@ -12,7 +12,7 @@ It's the third sibling after Many Write (the writing) and Many Apply (the grants
 
 ## What works in this build
 
-This build covers phases 1 to 5 of the spec. To keep the sidebar short, related screens are combined as tabs: **Bookkeeping** holds Ledger · Budget · Payments; **Schedule** holds Calendar · Availability · Scenes · Timeline (plus Stripboard for film projects); **Paperwork** holds Documents · Missing · W-9s · 1099s · My tax documents · Clearances; and "Who has what" is now the **Equipment log**.
+This build covers phases 1 to 6 of the spec. To keep the sidebar short, related screens are combined as tabs: **Bookkeeping** holds Ledger · Budget · Payments; **Schedule** holds Calendar · Availability · Scenes · Timeline (plus Stripboard for film projects); **Paperwork** holds Documents · Missing · W-9s · 1099s · My tax documents · Clearances; and "Who has what" is now the **Equipment log**.
 
 | Screen | What it does |
 | --- | --- |
@@ -22,14 +22,16 @@ This build covers phases 1 to 5 of the spec. To keep the sidebar short, related 
 | **Bookkeeping → Budget** | Expense lines with paid-to-date pulled from the ledger by category. Income sources with raised vs. goal **net of the sponsor fee**, expected date and confidence. Inline editing. Import/export in **Many Apply's budget CSV format**. |
 | **Bookkeeping → Payments** | Grouped as Overdue · Next 30 days · Later · Paid. **Ticking one paid creates the ledger entry** with project and category filled in; unticking removes it. Supports splits and `.ics` calendar export. |
 | **Schedule** | **Calendar:** rehearsals, read-throughs, fittings, design meetings, tech, dress, performances, shoots and strike, one week at a time. Choosing scenes calls the right people. Warnings appear when someone is called during a conflict, when a space is double-booked across projects, or when someone goes over a weekly hours limit you set. You can print a call sheet or the week's schedule, and export an `.ics` file for everyone or one person's calls only. **Availability:** **import everyone's availability from a CSV**, either a grid with names down the side and dates across (cells like `x`, `busy`, `after 6pm`, `2–5pm`) or one row per conflict. Names are matched to collaborators, new people can be added, re-imports replace older conflicts, and it can be undone. A people × dates grid shows conflicts, best dates for everyone or for one scene's cast (with one click to schedule), and hours called per person, with a one-click payment for hourly rates. You can also print a conflicts form to send round. **Scenes:** paste a scene list to get a scenes × characters grid, plus a cast list that maps characters to people. **Timeline:** a checklist by week or a timeline by department. Tasks can be set relative to key dates ("Opening − 8 weeks") and move when opening moves, with a preview before you save. Milestones from Payments, Paperwork and the Schedule appear automatically. Starter templates: Staged reading, Fringe / bar show, Full production and Closing checklist; save any project's timeline as a template. |
-| **Collaborators** | Table with role filters. The drawer shows roles, contact details, rate, W-9 status, **paid to date** from the ledger, projects, and a "Schedule payment" button. |
+| **Shopping list** | Everything a show needs to buy, rent or borrow. Each item has where to get it, department, project, **buyer** (Producer, a designer, someone else or unassigned, shown as colored pills, with filter chips), need-by date, estimated cost, and **money** (Producer card, Reimburse, In-kind, Paid by venue, or a sponsor fund). Items bought by anyone but you default to Reimburse. Ticking "got it" on something you paid for adds it to Bookkeeping. **Reimburse…** creates a payment to the buyer (or marks them paid back now), which lands in Bookkeeping under the department's category. A summary shows the estimated total and how much you still owe back. **Share a buyer's list** gives a designer just their items to copy, save or print. Open items show up in the cash forecast and on the Dashboard, and bought gear can move into the Equipment log. |
+| **Equipment log** | Gear, props, costumes, keys and anything borrowed or rented: category, owner (you, a collaborator, a venue or a rental house), serial, replacement value and condition. **Check out** and **check in** take two clicks, from the item or from a person's drawer, with condition notes and history. Views: by item, by person, overdue, and **rentals** grouped by order, with pickup, return-by, cost and a deposit tracked until it comes back, plus a late or damage fee becomes a payment. Warnings cover overdue returns, rentals due back within 2 days, deposits still out, and anything still checked out after a project closes. Prints a sign-out sheet and a gear list. |
+| **Collaborators** | Table with role filters. The drawer shows roles, contact details, rate, W-9 status, **paid to date** from the ledger, projects, what they're buying and are owed back, what gear they're holding, their paperwork, and a "Schedule payment" button. |
 | **Venues** | Card grid with status counts. The drawer shows the deposit schedule, linked from Payments. |
 | **Paperwork** | Every contract and tax document in one place, each with its type, project, the people and venues it involves, its status (Needed → Drafted → Sent → Signed by them → Fully signed) and dates. Every uploaded file is kept as a version (v1 sent, v2 signed). A **Missing** list flags a confirmed collaborator with no signed agreement, anyone paid with no W-9, a booked venue with no rental agreement or COI, a project with a sponsor but no sponsorship agreement, and anything expiring within 30 days. It also appears on the Dashboard and in each person's and venue's drawer. **Draft from template** fills an agreement from the person, venue and project, saves it as markdown you can edit, and prints or saves it as a PDF; its **fee schedule creates the payments**. A **W-9 tracker** shows on file or not, when it arrived, and a copyable request; it never reads taxpayer ID numbers. The **1099 tracker** totals what you paid each payee per year, with a threshold you set, and has CSV export. A one-click **year-end packet** zips the year's ledger, category totals, 1099 list, receipts and tax documents for your accountant. |
 | **Settings** | Vault, your name and company (used in templates), theme (Light, Dark, Pink or follow system), currency, money sources with opening balances, low-balance cushion, fiscal sponsors and fee rates, categories and tags. |
 
 Also included: the Cmd/Ctrl+K command palette (jumps to any screen, project, person, venue, entry or payment), Cmd/Ctrl+N for a new item, Cmd/Ctrl+\ to toggle the sidebar and Cmd/Ctrl+. to close the drawer. Changes save automatically, deletes can be undone, and nothing is hard-deleted: deleted files go to `.manyproduce/trash/`. The desktop app watches the vault folder, so edits made in other apps show up straight away.
 
-The other screens in the sidebar (Shopping list, Equipment log, Campaigns, Templates and Reports) and the Stripboard and Clearances tabs are marked **soon**. Each one shows what it will do.
+The other screens in the sidebar (Campaigns, Templates and Reports) and the Stripboard and Clearances tabs are marked **soon**. Each one shows what it will do.
 
 ## Roadmap (build phases from the spec)
 
@@ -38,13 +40,13 @@ The other screens in the sidebar (Shopping list, Equipment log, Campaigns, Templ
 3. ✅ Dashboard with the cash flow forecast
 4. ✅ Collaborators and Venues with drawers, Paperwork and tax documents
 5. ✅ Schedule builder and Timeline (one Schedule screen), with CSV availability import
-6. Shopping list with buyer tags and reimbursements, and the Equipment log
+6. ✅ Shopping list with buyer tags and reimbursements, and the Equipment log
 7. Campaigns and Templates
 8. Report builder, house reports, venue settlement, daily reports and PDF export
 9. Stripboard (a tab on Schedule) and Clearances (a tab on Paperwork)
 10. Todoist sync, CSV import/export, backup, packaging, GitHub Releases (the release workflow is already in `.github/workflows/release.yml`)
 
-Not built yet: the theme builder and the shared theme folder, and the option to keep `paperwork/tax/` outside the vault (for example in an encrypted disk image).
+Not built yet: photos on Equipment log items (condition is a text note for now), the theme builder and the shared theme folder, and the option to keep `paperwork/tax/` outside the vault (for example in an encrypted disk image).
 
 ## Running it
 

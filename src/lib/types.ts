@@ -89,6 +89,7 @@ export interface Payment {
   ledger_id: string;
   project_alloc: Alloc;
   notes: string;
+  shopping_item?: string; // set for reimbursements from the Shopping list
 }
 
 export type PersonStatus = "Reached out" | "Offer out" | "Confirmed" | "Past collaborator";
@@ -319,6 +320,70 @@ export interface TimelineTemplate {
   tasks: Omit<TimelineTask, "id" | "status" | "todoist_task_id">[];
 }
 
+// ---- Shopping list ----
+
+export type BuyerRole = "producer" | "designer" | "other" | "unassigned";
+export const SHOP_DEPARTMENTS = ["Costumes", "Props", "Set", "Lighting", "Sound", "Stage management", "Marketing", "Hair & makeup", "Other"];
+/** How an item is paid for. Sponsor funds (money sources linked to a sponsor) are also allowed. */
+export const SHOP_MONEY = ["Producer card", "Reimburse", "In-kind", "Paid by venue"];
+
+export interface ShoppingItem {
+  id: string;
+  project: string;
+  item: string;
+  where: string;
+  link: string;
+  department: string;
+  buyer: string; // "producer", a person slug, or "" (unassigned)
+  buyer_role: BuyerRole;
+  need_by: string;
+  est_cost: number | null;
+  actual_cost: number | null;
+  money: string; // one of SHOP_MONEY or a sponsor fund name
+  status: "Needed" | "Got it" | "Reimbursed";
+  receipt: string;
+  notes: string;
+  payment_id: string; // reimbursement payment
+  ledger_id: string; // expense entry for producer-paid items
+  inventory_id: string; // once moved into the Equipment log
+}
+
+// ---- Equipment log ----
+
+export const INVENTORY_CATEGORIES = ["Camera", "Lighting", "Sound", "Grip", "Props", "Costumes", "Set pieces", "Keys / access", "Laptop / hard drives", "Other"];
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  owner: string; // "producer", "person:<slug>", "venue:<slug>", or a rental house name
+  project: string;
+  serial: string;
+  value: number | null; // replacement value
+  rental_house: string; // set for rented items
+  rental_order: string; // groups items rented together
+  rental_cost: number | null;
+  rental_start: string; // pickup
+  rental_end: string; // return by
+  deposit: number | null;
+  deposit_returned: boolean;
+  returned: boolean; // rented item returned to the rental house
+  condition: string;
+  notes: string;
+}
+
+export interface Checkout {
+  id: string;
+  item: string; // item id
+  person: string; // person slug
+  out_date: string;
+  due_date: string;
+  in_date: string; // blank = still out
+  condition_out: string;
+  condition_in: string;
+  notes: string;
+}
+
 export interface VaultData {
   projects: Project[];
   ledger: LedgerEntry[];
@@ -336,4 +401,7 @@ export interface VaultData {
   scenes: Record<string, Scene[]>; // by project
   timelines: Record<string, TimelineTask[]>; // by project
   timelineTemplates: TimelineTemplate[];
+  shopping: Record<string, ShoppingItem[]>; // by project
+  inventory: InventoryItem[];
+  checkouts: Checkout[];
 }

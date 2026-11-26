@@ -22,6 +22,7 @@ export function paymentsFromMd(text: string): { payments: Payment[]; body: strin
     ledger_id: p.ledger_id ?? "",
     project_alloc: parseAlloc(String(p.project_alloc ?? "")),
     notes: p.notes ?? "",
+    ...(p.shopping_item ? { shopping_item: String(p.shopping_item) } : {}),
   })) as Payment[];
   return { payments, body };
 }
@@ -60,7 +61,7 @@ export function ledgerEntryForPayment(p: Payment, paidDate: string): LedgerEntry
     receipt: "",
     restricted_to: "",
     linked_payment: p.id,
-    linked_shopping_item: "",
+    linked_shopping_item: p.shopping_item ?? "",
     notes: "",
   };
 }

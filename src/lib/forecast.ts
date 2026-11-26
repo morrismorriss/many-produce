@@ -1,7 +1,7 @@
 // Week-by-week cash flow forecast (Dashboard's main chart).
 import { expenseActuals, incomeActuals, unscheduledAmount } from "./budget";
 import { projectFeeRate, sourceBalances } from "./ledger";
-import type { BudgetLine, LedgerEntry, MoneySource, Payment, Project, Sponsor } from "./types";
+import type { BudgetLine, LedgerEntry, MoneySource, Payment, Project, ShoppingItem, Sponsor } from "./types";
 import { addDays, round2, shareOf, weekStart } from "./util";
 
 export type Scenario = "confirmed" | "likely";
@@ -11,7 +11,7 @@ export interface ForecastItem {
   amount: number; // signed
   source: string;
   label: string;
-  kind: "payment" | "income";
+  kind: "payment" | "income" | "shopping";
   ref: { project: string; id: string };
   confidence?: string;
 }
@@ -60,6 +60,7 @@ export interface ForecastInput {
   budgets: Record<string, BudgetLine[]>;
   projects: Project[];
   sponsors: Sponsor[];
+  shopping?: ShoppingItem[];
   fmt: (n: number) => string;
 }
 
@@ -101,6 +102,25 @@ export function buildForecast(inp: ForecastInput): Forecast {
       label: `${p.title}${p.payee ? ` (${p.payee})` : ""}`,
       kind: "payment",
       ref: { project: Object.keys(p.project_alloc)[0], id: p.id },
+    });
+  }
+
+  // Shopping list: estimated cost by need-by date, until it's bought (or, for
+  // reimbursements, until the reimbursement is scheduled as a payment).
+  for (const i of inp.shopping ?? []) {
+    if (project && i.project !== project) continue;
+    if (i.money === "In-kind" || i.money === "Paid by venue") continue;
+    const open = i.status === "Needed" || (i.money === "Reimburse" && i.status === "Got it" && !i.payment_id);
+    const amount = i.actual_cost ?? i.est_cost ?? 0;
+    if (!open || !(amount > 0)) continue;
+    const isFund = inp.sources.some((s) => s.name === i.money);
+    items.push({
+      date: i.need_by && i.need_by >= first ? i.need_by : first,
+      amount: -round2(amount),
+      source: isFund ? i.money : i.money === "Producer card" ? "Card" : "Checking",
+      label: `Buy: ${i.item}`,
+      kind: "shopping",
+      ref: { project: i.project, id: i.id },
     });
   }
 

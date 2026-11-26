@@ -12,7 +12,9 @@ import {
   upsertWithFees,
 } from "../src/lib/ledger";
 import { groupOf, ledgerEntryForPayment, paymentsFromMd, paymentsToICS, paymentsToMd } from "../src/lib/payments";
-import { FISCAL_TAG, type LedgerEntry, type Payment, type Person, type Project, type ScheduleEvent, type Sponsor } from "../src/lib/types";
+import { FISCAL_TAG, type LedgerEntry, type Payment, type Person, type Project, type ScheduleEvent, type ShoppingItem, type InventoryItem, type Sponsor } from "../src/lib/types";
+import { buyerRole, defaultMoney, owedTo, producerPurchaseEntry, reimbursementPayment, shoppingFromCSV, shoppingToCSV, summarize as shopSummary } from "../src/lib/shopping";
+import { checkoutsFromCSV, checkoutsToCSV, gearWarnings, holderOf, itemsFromCSV, itemsToCSV, rentalOrders } from "../src/lib/inventory";
 import { matchNames, mergeConflicts, parseAvailabilityCSV, parseLooseDate, parseLooseTime } from "../src/lib/availabilityImport";
 import { bestDates, calledForScenes, eventsToICS, hoursTally, parseScenesPaste, scheduleWarnings } from "../src/lib/schedule";
 import { STARTER_TIMELINE_TEMPLATES, anchorsFor, applyTemplate, relLabel, resolveDue, shiftPreview, timelineFromMd, timelineToMd } from "../src/lib/timeline";
@@ -404,5 +406,76 @@ describe("schedule + timeline", () => {
     expect(prev[0]).toMatchObject({ before: "2027-02-01", after: "2027-02-08" });
     const md = timelineToMd(tasks);
     expect(timelineFromMd(md).tasks).toEqual(tasks);
+  });
+});
+
+describe("shopping list", () => {
+  const people = [
+    { slug: "jun", name: "Jun Park", roles: ["Lighting"] },
+    { slug: "maya", name: "Maya", roles: ["Actor"] },
+  ] as Person[];
+  const item = (x: Partial<ShoppingItem>): ShoppingItem => ({
+    id: "i", project: "a", item: "Gel", where: "B&H", link: "", department: "Lighting", buyer: "", buyer_role: "unassigned", need_by: "2026-12-10",
+    est_cost: 40, actual_cost: null, money: "Producer card", status: "Needed", receipt: "", notes: "", payment_id: "", ledger_id: "", inventory_id: "", ...x,
+  });
+  it("round-trips shopping.csv", () => {
+    const i = item({ notes: "Rosco, 2 sheets" });
+    expect(shoppingFromCSV("a", shoppingToCSV([i]))).toEqual([i]);
+  });
+  it("tags buyers and picks the default money", () => {
+    expect(buyerRole("jun", people)).toBe("designer");
+    expect(buyerRole("maya", people)).toBe("other");
+    expect(buyerRole("producer", people)).toBe("producer");
+    expect(buyerRole("", people)).toBe("unassigned");
+    expect(defaultMoney("jun")).toBe("Reimburse");
+    expect(defaultMoney("producer")).toBe("Producer card");
+  });
+  it("totals what's owed and creates reimbursements and producer expenses", () => {
+    const items = [item({ id: "1", buyer: "jun", money: "Reimburse", status: "Got it", actual_cost: 55 }), item({ id: "2", buyer: "jun", money: "Reimburse" }), item({ id: "3", money: "In-kind", est_cost: 100 })];
+    expect(shopSummary(items, [])).toEqual({ count: 3, open: 2, estimated: 195, toReimburse: 55 });
+    expect(owedTo("jun", items, []).owed).toBe(55);
+    const pay = reimbursementPayment(items[0], "Jun Park", "Checking", "2026-12-01");
+    expect(pay).toMatchObject({ payee: "Jun Park", amount: 55, category: "Lighting & sound", shopping_item: "1", project_alloc: { a: 1 } });
+    expect(ledgerEntryForPayment(pay, "2026-12-02").linked_shopping_item).toBe("1");
+    expect(shopSummary(items, [{ ...pay, status: "paid" }]).toReimburse).toBe(55); // not linked yet
+    expect(shopSummary([{ ...items[0], payment_id: pay.id }], [{ ...pay, status: "paid" }]).toReimburse).toBe(0);
+    expect(producerPurchaseEntry(item({ money: "Producer card" }), "2026-12-01", [])).toMatchObject({ source: "Card", amount: 40, category: "Lighting & sound", linked_shopping_item: "i" });
+    expect(producerPurchaseEntry(item({ money: "Fractured Atlas fund" }), "2026-12-01", [{ name: "Fractured Atlas fund", opening_balance: 0, opening_date: "" }])!.source).toBe("Fractured Atlas fund");
+    expect(producerPurchaseEntry(item({ money: "In-kind" }), "2026-12-01", [])).toBeNull();
+  });
+  it("puts open shopping items in the cash forecast", async () => {
+    const today = "2026-11-26";
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const shopping = [item({ id: "s1", project: "prodigy", item: "Gel", need_by: "2026-12-10", est_cost: 40 }), item({ id: "s2", project: "prodigy", money: "In-kind" })];
+    const f = buildForecast({ today, weeks: 6, scenario: "confirmed", cushion: 0, sources: v.settings.money_sources, ledger: v.ledger, payments: Object.values(v.payments).flat(), budgets: v.budgets, projects: v.projects, sponsors: v.sponsors, shopping, fmt: String });
+    const buys = f.weeks.flatMap((w) => w.items).filter((i) => i.kind === "shopping");
+    expect(buys).toEqual([expect.objectContaining({ label: "Buy: Gel", amount: -40, source: "Card", date: "2026-12-10" })]);
+  });
+});
+
+describe("equipment log", () => {
+  const it0 = (x: Partial<InventoryItem>): InventoryItem => ({
+    id: "c1", name: "Camera A", category: "Camera", owner: "producer", project: "a", serial: "123", value: 2000, rental_house: "", rental_order: "", rental_cost: null,
+    rental_start: "", rental_end: "", deposit: null, deposit_returned: false, returned: false, condition: "", notes: "", ...x,
+  });
+  it("round-trips items and check-outs", () => {
+    const i = it0({ rental_house: "Lens Co", deposit: 500, deposit_returned: true });
+    expect(itemsFromCSV(itemsToCSV([i]))).toEqual([i]);
+    const c = { id: "x", item: "c1", person: "ana", out_date: "2026-11-01", due_date: "2026-11-10", in_date: "", condition_out: "Good", condition_in: "", notes: "" };
+    expect(checkoutsFromCSV(checkoutsToCSV([c]))).toEqual([c]);
+  });
+  it("warns about overdue gear, rentals due back, deposits and gear out after closing", () => {
+    const people = [{ slug: "ana", name: "Ana" }] as Person[];
+    const projects = [{ slug: "a", name: "Show A" }] as Project[];
+    const items = [
+      it0({ id: "1" }),
+      it0({ id: "2", name: "Lens", rental_house: "Lens Co", rental_end: "2026-11-27" }),
+      it0({ id: "3", name: "Dolly", rental_house: "Grip Co", rental_end: "2026-11-20", returned: true, deposit: 200 }),
+    ];
+    const checkouts = [{ id: "x", item: "1", person: "ana", out_date: "2026-11-01", due_date: "2026-11-10", in_date: "", condition_out: "", condition_in: "", notes: "" }];
+    const w = gearWarnings(items, checkouts, people, projects, () => "2026-11-15", "2026-11-26");
+    expect(w.map((x) => x.kind).sort()).toEqual(["after-closing", "deposit", "overdue", "rental-due"]);
+    expect(holderOf("1", checkouts)?.person).toBe("ana");
+    expect(rentalOrders(items).map((o) => o.house)).toEqual(["Lens Co", "Grip Co"].sort((a, b) => a.localeCompare(b)).length ? expect.arrayContaining(["Lens Co", "Grip Co"]) : []);
   });
 });

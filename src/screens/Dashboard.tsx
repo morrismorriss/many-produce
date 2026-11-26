@@ -12,6 +12,8 @@ import { PaymentModal } from "./Payments";
 import { MissingList } from "./Paperwork";
 import { missingPaperwork } from "../lib/paperwork";
 import { anchorsFor, resolveDue } from "../lib/timeline";
+import { summarize as shopSummary } from "../lib/shopping";
+import { useGearWarnings } from "./Equipment";
 
 export function Dashboard() {
   const app = useApp();
@@ -27,6 +29,7 @@ export function Dashboard() {
       buildForecast({
         today, weeks, project, scenario, cushion: data.settings.cushion, sources: data.settings.money_sources,
         ledger: data.ledger, payments: allPayments, budgets: data.budgets, projects: data.projects, sponsors: data.sponsors,
+        shopping: Object.values(data.shopping).flat(),
         fmt: (n) => money(n),
       }),
     [today, weeks, project, scenario, data, allPayments, money],
@@ -60,11 +63,14 @@ export function Dashboard() {
       return (data.timelines[p.slug] ?? []).map((t) => ({ t, p, due: resolveDue(t, a) }));
     })
     .filter(({ t }) => t.status !== "Done" && t.status !== "Skipped");
+  const toReimburse = shopSummary(Object.values(data.shopping).flat().filter((i) => !project || i.project === project), allPayments).toReimburse;
+  const gear = useGearWarnings(project);
   const overdueTasks = timelineRows.filter(({ due }) => due && due < today);
   type WeekItem = { date: string; time: string; kind: string; pill: string; text: string; go: () => void };
   const week: WeekItem[] = [
     ...payments.filter((p) => p.status === "scheduled" && in7(p.due)).map((p) => ({ date: p.due, time: "", kind: "Payment", pill: "pink", text: `${p.title} · ${money(p.amount)}`, go: () => { setScreen("payments"); openDrawer({ kind: "payment", id: p.id }); } })),
     ...data.events.filter((e) => (!project || e.project === project) && in7(e.date)).map((e) => ({ date: e.date, time: e.start, kind: e.type, pill: "blue", text: `${e.start ? `${e.start} ` : ""}${e.title || e.type}${project ? "" : ` · ${data.projects.find((p) => p.slug === e.project)?.name ?? ""}`}`, go: () => setScreen("schedule") })),
+    ...Object.values(data.shopping).flat().filter((i) => (!project || i.project === project) && i.status === "Needed" && in7(i.need_by)).map((i) => ({ date: i.need_by, time: "", kind: "Buy", pill: "amber", text: `${i.item}${i.buyer && i.buyer !== "producer" ? ` (${data.people.find((p) => p.slug === i.buyer)?.name ?? i.buyer})` : ""}`, go: () => setScreen("shopping") })),
     ...timelineRows.filter(({ due }) => in7(due)).map(({ t, p, due }) => ({ date: due, time: "", kind: "Task", pill: "", text: `${t.title}${project ? "" : ` · ${p.name}`}`, go: () => setScreen("schedule") })),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
 
@@ -185,6 +191,20 @@ export function Dashboard() {
                   <button className="btn small" onClick={() => { setScreen("payments"); openDrawer({ kind: "payment", id: p.id }); }}>Open</button>
                 </li>
               ))}
+              {toReimburse > 0 && (
+                <li>
+                  <span className="pill amber">Reimburse</span>
+                  <span>{money(toReimburse)} owed back to collaborators for things they bought</span>
+                  <button className="btn small" onClick={() => setScreen("shopping")}>Open</button>
+                </li>
+              )}
+              {gear.map((g, i) => (
+                <li key={"g" + i}>
+                  <span className={`pill ${g.kind === "rental-due" ? "amber" : "red"}`}>Gear</span>
+                  <span>{g.message}</span>
+                  <button className="btn small" onClick={() => setScreen("inventory")}>Open</button>
+                </li>
+              ))}
               {overdueTasks.length > 0 && (
                 <li>
                   <span className="pill red">Timeline</span>
@@ -199,14 +219,14 @@ export function Dashboard() {
                   <button className="btn small" onClick={() => setLow(l)}>Fix</button>
                 </li>
               ))}
-              {!overdue.length && !missing.length && !firstLowPerSource.length && !overdueTasks.length && <li className="muted">Nothing needs attention. Nice.</li>}
+              {!overdue.length && !missing.length && !firstLowPerSource.length && !overdueTasks.length && !toReimburse && !gear.length && <li className="muted">Nothing needs attention. Nice.</li>}
             </ul>
             {missing.length > 0 && (
               <div style={{ marginTop: 8 }}>
                 <MissingList missing={missing} compact={!!project} />
               </div>
             )}
-            <p className="small muted" style={{ marginTop: 10 }}>Reimbursements, house reports and gear returns join this list as those screens are built.</p>
+            <p className="small muted" style={{ marginTop: 10 }}>House reports, daily reports and sponsor report due dates join this list when Reports is built.</p>
           </section>
 
           <section className="card" aria-label="This week">

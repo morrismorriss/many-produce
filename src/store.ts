@@ -7,13 +7,14 @@ import type { VaultFS } from "./lib/fs";
 import { removeWithFees, upsertWithFees } from "./lib/ledger";
 import { ledgerEntryForPayment } from "./lib/payments";
 import { newDocPath, paymentsForSchedule } from "./lib/paperwork";
+import type { Conflict, Scene, ScheduleEvent, TimelineTask, TimelineTemplate } from "./lib/types";
 import type { BudgetLine, Issued1099, LedgerEntry, PaperDoc, Payment, Person, Project, Settings, Sponsor, Template, Venue, VaultData } from "./lib/types";
 import { fmtMoney, primaryProject, todayISO, uid } from "./lib/util";
 import * as vault from "./lib/vault";
 
 export type Screen =
   | "dashboard" | "collaborators" | "venues" | "bookkeeping" | "budget" | "payments" | "shopping"
-  | "paperwork" | "schedule" | "timeline" | "stripboard" | "clearances" | "inventory" | "campaigns"
+  | "paperwork" | "schedule" | "inventory" | "campaigns"
   | "templates" | "reports" | "settings";
 
 export interface Toast {
@@ -28,6 +29,7 @@ export type DrawerTarget =
   | { kind: "entry"; id: string }
   | { kind: "payment"; id: string }
   | { kind: "doc"; path: string }
+  | { kind: "event"; id: string }
   | null;
 
 interface State {
@@ -70,6 +72,12 @@ interface State {
   createSchedulePayments: (path: string) => Promise<number>;
   saveIssued1099: (year: string, rows: Issued1099[]) => Promise<void>;
   saveTemplate: (t: Template) => Promise<void>;
+  saveEvent: (e: ScheduleEvent) => Promise<void>;
+  deleteEvent: (id: string) => Promise<void>;
+  saveConflicts: (c: Conflict[]) => Promise<void>;
+  saveScenes: (project: string, s: Scene[]) => Promise<void>;
+  saveTimeline: (project: string, tasks: TimelineTask[]) => Promise<void>;
+  saveTimelineTemplate: (t: TimelineTemplate) => Promise<void>;
   reload: (quiet?: boolean) => Promise<void>;
 }
 
@@ -278,6 +286,38 @@ export const useStore = create<State>()((set, get) => {
     saveTemplate: async (t) => {
       patch((d) => ({ templates: upsert(d.templates, t, (x) => x.slug) }));
       await vault.saveTemplate(get().fs, t).catch(fail);
+    },
+
+    saveEvent: async (e) => {
+      const prev = get().data.events.find((x) => x.id === e.id);
+      patch((d) => ({ events: upsert(d.events, e, (x) => x.id) }));
+      const all = get().data.events;
+      await vault.saveEvents(get().fs, e.project, all).catch(fail);
+      if (prev && prev.project !== e.project) await vault.saveEvents(get().fs, prev.project, all).catch(fail);
+    },
+    deleteEvent: async (id) => {
+      const e = get().data.events.find((x) => x.id === id);
+      if (!e) return;
+      patch((d) => ({ events: d.events.filter((x) => x.id !== id) }));
+      await vault.saveEvents(get().fs, e.project, get().data.events).catch(fail);
+      set({ drawer: null });
+      get().toast("Event deleted", () => void get().saveEvent(e));
+    },
+    saveConflicts: async (c) => {
+      patch(() => ({ conflicts: c }));
+      await vault.saveConflicts(get().fs, c).catch(fail);
+    },
+    saveScenes: async (project, sc) => {
+      patch((d) => ({ scenes: { ...d.scenes, [project]: sc } }));
+      await vault.saveScenes(get().fs, project, sc).catch(fail);
+    },
+    saveTimeline: async (project, tasks) => {
+      patch((d) => ({ timelines: { ...d.timelines, [project]: tasks } }));
+      await vault.saveTimeline(get().fs, project, tasks).catch(fail);
+    },
+    saveTimelineTemplate: async (t) => {
+      patch((d) => ({ timelineTemplates: upsert(d.timelineTemplates, t, (x) => x.slug) }));
+      await vault.saveTimelineTemplate(get().fs, t).catch(fail);
     },
 
     reload: async (quiet) => {

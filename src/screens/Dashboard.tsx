@@ -11,6 +11,7 @@ import { Header } from "../components/Shell";
 import { PaymentModal } from "./Payments";
 import { MissingList } from "./Paperwork";
 import { missingPaperwork } from "../lib/paperwork";
+import { anchorsFor, resolveDue } from "../lib/timeline";
 
 export function Dashboard() {
   const app = useApp();
@@ -50,9 +51,22 @@ export function Dashboard() {
 
   const missing = useMemo(() => missingPaperwork(data, project, today), [data, project, today]);
 
-  const week = payments
-    .filter((p) => p.status === "scheduled" && p.due >= today && p.due <= addDays(today, 7))
-    .sort((a, b) => a.due.localeCompare(b.due));
+  // The next 7 days from Payments, the Schedule and the Timeline.
+  const in7 = (d: string) => d >= today && d <= addDays(today, 7);
+  const timelineRows = data.projects
+    .filter((p) => !project || p.slug === project)
+    .flatMap((p) => {
+      const a = anchorsFor(p, data.events);
+      return (data.timelines[p.slug] ?? []).map((t) => ({ t, p, due: resolveDue(t, a) }));
+    })
+    .filter(({ t }) => t.status !== "Done" && t.status !== "Skipped");
+  const overdueTasks = timelineRows.filter(({ due }) => due && due < today);
+  type WeekItem = { date: string; time: string; kind: string; pill: string; text: string; go: () => void };
+  const week: WeekItem[] = [
+    ...payments.filter((p) => p.status === "scheduled" && in7(p.due)).map((p) => ({ date: p.due, time: "", kind: "Payment", pill: "pink", text: `${p.title} · ${money(p.amount)}`, go: () => { setScreen("payments"); openDrawer({ kind: "payment", id: p.id }); } })),
+    ...data.events.filter((e) => (!project || e.project === project) && in7(e.date)).map((e) => ({ date: e.date, time: e.start, kind: e.type, pill: "blue", text: `${e.start ? `${e.start} ` : ""}${e.title || e.type}${project ? "" : ` · ${data.projects.find((p) => p.slug === e.project)?.name ?? ""}`}`, go: () => setScreen("schedule") })),
+    ...timelineRows.filter(({ due }) => in7(due)).map(({ t, p, due }) => ({ date: due, time: "", kind: "Task", pill: "", text: `${t.title}${project ? "" : ` · ${p.name}`}`, go: () => setScreen("schedule") })),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
 
   // Chart rows
   const rows = f.weeks.map((w) => ({
@@ -171,6 +185,13 @@ export function Dashboard() {
                   <button className="btn small" onClick={() => { setScreen("payments"); openDrawer({ kind: "payment", id: p.id }); }}>Open</button>
                 </li>
               ))}
+              {overdueTasks.length > 0 && (
+                <li>
+                  <span className="pill red">Timeline</span>
+                  <span>{overdueTasks.length} overdue task{overdueTasks.length > 1 ? "s" : ""}: {overdueTasks.slice(0, 2).map(({ t }) => t.title).join(", ")}{overdueTasks.length > 2 ? "…" : ""}</span>
+                  <button className="btn small" onClick={() => setScreen("schedule")}>Open</button>
+                </li>
+              )}
               {firstLowPerSource.map((l) => (
                 <li key={"l" + l.week + l.source}>
                   <span className="pill red">Low point</span>
@@ -178,29 +199,29 @@ export function Dashboard() {
                   <button className="btn small" onClick={() => setLow(l)}>Fix</button>
                 </li>
               ))}
-              {!overdue.length && !missing.length && !firstLowPerSource.length && <li className="muted">Nothing needs attention. Nice.</li>}
+              {!overdue.length && !missing.length && !firstLowPerSource.length && !overdueTasks.length && <li className="muted">Nothing needs attention. Nice.</li>}
             </ul>
             {missing.length > 0 && (
               <div style={{ marginTop: 8 }}>
                 <MissingList missing={missing} compact={!!project} />
               </div>
             )}
-            <p className="small muted" style={{ marginTop: 10 }}>Timeline tasks, reimbursements, house reports and gear returns join this list as those screens are built.</p>
+            <p className="small muted" style={{ marginTop: 10 }}>Reimbursements, house reports and gear returns join this list as those screens are built.</p>
           </section>
 
           <section className="card" aria-label="This week">
             <div className="card-head"><h2>This week</h2></div>
             {week.length ? (
               <ul className="attn">
-                {week.map((p) => (
-                  <li key={p.id}>
-                    <span className="pill pink">Payment</span>
-                    <span>{fmtDate(p.due)} · {p.title} · {money(p.amount)}</span>
+                {week.map((w, i) => (
+                  <li key={i} style={{ cursor: "pointer" }} onClick={w.go}>
+                    <span className={`pill ${w.pill}`}>{w.kind}</span>
+                    <span><strong>{fmtDate(w.date)}</strong> · {w.text}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="muted">Nothing due in the next 7 days.</p>
+              <p className="muted">Nothing in the next 7 days.</p>
             )}
           </section>
         </div>

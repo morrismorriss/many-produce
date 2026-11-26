@@ -102,6 +102,15 @@ export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
         </section>
 
         <section className="card">
+          <div className="card-head"><h2>Schedule</h2></div>
+          <div className="form-grid">
+            <Field label="Warn over this many hours called per person per week (0 = off)">
+              <input type="number" min={0} value={s.max_hours_week} onChange={(e) => save({ max_hours_week: Number(e.target.value) || 0 })} />
+            </Field>
+          </div>
+        </section>
+
+        <section className="card">
           <div className="card-head"><h2>Fiscal sponsors</h2><div className="spacer" /><button className="btn small" onClick={() => { const name = prompt("Sponsor name"); if (name) void saveSponsor({ slug: slugify(name), name, fee_rate: 0, fee_applies_to: "contributed income", contact: "", account_url: "", review_required_for: [], report_schedule: "", notes: "" }); }}>+ Sponsor</button></div>
           <table className="t">
             <thead><tr><th>Name</th><th className="r">Fee rate (%)</th><th>Contact</th><th>Notes</th></tr></thead>

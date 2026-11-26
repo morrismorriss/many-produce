@@ -4,6 +4,7 @@ import { Bookkeeping } from "./screens/Bookkeeping";
 import { Budget } from "./screens/Budget";
 import { Dashboard } from "./screens/Dashboard";
 import { Paperwork } from "./screens/Paperwork";
+import { Schedule } from "./screens/Schedule";
 import { Payments } from "./screens/Payments";
 import { Collaborators, Venues } from "./screens/People";
 import { Placeholder } from "./screens/Placeholder";
@@ -157,6 +158,7 @@ function Frame({ onSwitchVault }: { onSwitchVault: () => void }) {
   else if (screen === "collaborators") body = <Collaborators />;
   else if (screen === "venues") body = <Venues />;
   else if (screen === "paperwork") body = <Paperwork />;
+  else if (screen === "schedule") body = <Schedule />;
   else body = <Settings onSwitchVault={onSwitchVault} />;
 
   return (

@@ -18,6 +18,8 @@ import {
 } from "./types";
 import { addDays, todayISO } from "./util";
 import { docToMd } from "./paperwork";
+import { conflictsToCSV, eventsToCSV, scenesToCSV } from "./schedule";
+import { STARTER_TIMELINE_TEMPLATES, applyTemplate, timelineToMd } from "./timeline";
 import { OVERHEAD_PROJECT, PRESET_SPONSORS, SETTINGS_PATH, personToMd, projectToMd, sponsorToMd, venueToMd } from "./vault";
 
 export function sampleVault(today = todayISO()): Record<string, string> {
@@ -57,6 +59,7 @@ export function sampleVault(today = todayISO()): Record<string, string> {
       fiscal_sponsor: "producer-hub",
       sponsor_fee_rate: null,
       notes: "One-night staged reading with talkback.",
+      cast: { VINNIE: "leo-grant", CARMELA: "maya-ostrowski", ROSE: "rosa-diaz" },
     },
   ];
   for (const p of projects) files[`projects/${p.slug}/project.md`] = projectToMd(p);
@@ -177,6 +180,8 @@ export function sampleVault(today = todayISO()): Record<string, string> {
     { slug: "ana-reyes", name: "Ana Reyes", roles: ["Director"], projects: ["prodigy"], email: "ana@example.com", phone: "", city: "Chicago", rate: "1500", rate_type: "flat", status: "Confirmed", pronouns: "she/her", payment_method: "Zelle", w9_on_file: true, w9_date: d(-25), notes: "Directed our 2025 reading." },
     { slug: "jun-park", name: "Jun Park", roles: ["Lighting"], projects: ["prodigy"], email: "jun@example.com", phone: "", city: "Chicago", rate: "600", rate_type: "flat", status: "Offer out", pronouns: "they/them", payment_method: "Venmo", w9_on_file: false, w9_date: "", notes: "" },
     { slug: "maya-ostrowski", name: "Maya Ostrowski", roles: ["Actor"], projects: ["prodigy", "made-men-reading"], email: "maya@example.com", phone: "", city: "Evanston", rate: "400", rate_type: "stipend", status: "Confirmed", pronouns: "", payment_method: "", w9_on_file: false, w9_date: "", notes: "" },
+    { slug: "leo-grant", name: "Leo Grant", roles: ["Actor"], projects: ["made-men-reading"], email: "leo@example.com", phone: "", city: "Chicago", rate: "100", rate_type: "stipend", status: "Offer out", pronouns: "he/him", payment_method: "", w9_on_file: false, w9_date: "", notes: "" },
+    { slug: "rosa-diaz", name: "Rosa Díaz", roles: ["Actor"], projects: ["made-men-reading"], email: "rosa@example.com", phone: "", city: "Chicago", rate: "100", rate_type: "stipend", status: "Offer out", pronouns: "she/her", payment_method: "", w9_on_file: false, w9_date: "", notes: "" },
     { slug: "dev-okafor", name: "Dev Okafor", roles: ["Stage manager"], projects: ["made-men-reading"], email: "dev@example.com", phone: "", city: "Chicago", rate: "25", rate_type: "hourly", status: "Reached out", pronouns: "he/him", payment_method: "", w9_on_file: false, w9_date: "", notes: "" },
   ];
   for (const p of people) files[`people/${p.slug}.md`] = personToMd(p);
@@ -187,6 +192,45 @@ export function sampleVault(today = todayISO()): Record<string, string> {
     { slug: "hop-hall", name: "Hop Hall Brewery", type: "brewery", city: "Chicago", capacity: 80, rate: "Bar minimum $800", tech_notes: "", status: "Toured", projects: [], next_step: "Ask about Monday nights", contact: "", hold_dates: "", notes: "" },
   ];
   for (const v of venues) files[`venues/${v.slug}.md`] = venueToMd(v);
+
+  // Schedule
+  const ev = (id: string, project: string, date: string, type: string, x: Partial<import("./types").ScheduleEvent> = {}) =>
+    ({ id, project, date, start: "18:30", end: "21:30", type, title: "", location: "", called: [], scenes: [], notes: "", ...x });
+  files["schedule/prodigy.csv"] = eventsToCSV([
+    ev("ev1", "prodigy", d(1), "Design meeting", { title: "Lighting concept", start: "18:00", end: "19:30", called: ["ana-reyes", "jun-park"], location: "Zoom" }),
+    ev("ev2", "prodigy", d(4), "Read-through", { start: "13:00", end: "16:00", called: ["ana-reyes", "maya-ostrowski"], location: "uptown-studio-theatre" }),
+  ]);
+  const mm = ["leo-grant", "maya-ostrowski", "rosa-diaz", "dev-okafor"];
+  files["schedule/made-men-reading.csv"] = eventsToCSV([
+    ev("ev3", "made-men-reading", d(3), "Read-through", { called: mm, location: "fulton-gallery" }),
+    ev("ev4", "made-men-reading", d(68), "Rehearsal", { title: "Act 1", called: ["leo-grant", "maya-ostrowski", "dev-okafor"], scenes: ["s1", "s2"] }),
+    ev("ev5", "made-men-reading", d(72), "Rehearsal", { title: "Act 2", called: mm, scenes: ["s3", "s4"] }),
+    ev("ev6", "made-men-reading", d(75), "Performance", { title: "Reading + talkback", start: "19:30", end: "22:00", called: mm, location: "fulton-gallery" }),
+  ]);
+  files["schedule/made-men-reading-scenes.csv"] = scenesToCSV([
+    { id: "s1", number: "1.1", title: "The diner", characters: ["VINNIE", "CARMELA"] },
+    { id: "s2", number: "1.2", title: "Back office", characters: ["VINNIE"] },
+    { id: "s3", number: "2.1", title: "Wedding", characters: ["VINNIE", "CARMELA", "ROSE"] },
+    { id: "s4", number: "2.2", title: "Parking lot", characters: ["ROSE", "CARMELA"] },
+  ]);
+  files["schedule/conflicts.csv"] = conflictsToCSV([
+    { id: "c1", person: "maya-ostrowski", date: d(72), start: "", end: "", note: "Other show" },
+    { id: "c2", person: "leo-grant", date: d(68), start: "17:00", end: "19:00", note: "Work" },
+    { id: "c3", person: "rosa-diaz", date: d(69), start: "", end: "", note: "" },
+    { id: "c4", person: "rosa-diaz", date: d(70), start: "", end: "", note: "" },
+  ]);
+
+  // Timelines
+  const tl = (slug: string) => applyTemplate(STARTER_TIMELINE_TEMPLATES.find((t) => t.slug === slug)!);
+  const reading = tl("staged-reading");
+  reading.slice(0, 2).forEach((t) => (t.status = "Done"));
+  files["timeline/made-men-reading.md"] = timelineToMd(reading);
+  const full = tl("full-production");
+  full.slice(0, 2).forEach((t) => (t.status = "Done"));
+  files["timeline/prodigy.md"] = timelineToMd([
+    { id: "t-grant", title: "Submit city arts micro-grant", due: d(-2), rel: null, owner: "producer", status: "To do", department: "Fundraising", phase: "", link: "", todoist: false, todoist_task_id: "" },
+    ...full,
+  ]);
 
   // Paperwork
   const doc = (path: string, x: Partial<PaperDoc>) => {

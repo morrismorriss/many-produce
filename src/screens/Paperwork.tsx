@@ -21,7 +21,7 @@ import { DOC_STATUSES, DOC_TYPES, type DocStatus, type PaperDoc } from "../lib/t
 import { fmtDate, todayISO } from "../lib/util";
 import { useApp } from "../store";
 
-type Tab = "Documents" | "Missing" | "W-9s" | "1099s" | "My tax documents";
+type Tab = "Documents" | "Missing" | "W-9s" | "1099s" | "My tax documents" | "Clearances";
 
 export const STATUS_PILL: Record<DocStatus, string> = {
   Needed: "red", Drafted: "", Sent: "blue", "Signed by them": "amber", "Fully signed": "green", Expired: "red", Void: "",
@@ -53,13 +53,20 @@ export function Paperwork() {
       />
       <div className="content">
         <div className="toolbar">
-          <Chips label="View" options={["Documents", "Missing", "W-9s", "1099s", "My tax documents"] as const} value={tab} onChange={setTab} />
+          <Chips label="View" options={["Documents", "Missing", "W-9s", "1099s", "My tax documents", "Clearances"] as const} value={tab} onChange={setTab} />
           {missing.length > 0 && tab !== "Missing" && <button className="pill red" style={{ border: 0, cursor: "pointer" }} onClick={() => setTab("Missing")}>{missing.length} missing</button>}
         </div>
         {tab === "Documents" && <DocumentsTab onOpen={(path) => openDrawer({ kind: "doc", path })} />}
         {tab === "Missing" && <MissingTab missing={missing} onAdd={setAdding} />}
         {tab === "W-9s" && <W9Tab />}
         {tab === "1099s" && <Tab1099 />}
+        {tab === "Clearances" && (
+          <div className="placeholder card">
+            <span className="pill amber">Build phase 9</span>
+            <h2 style={{ marginTop: 10 }}>Clearances are coming in a later build</h2>
+            <p className="muted">Every right and permission a project needs before it can be shown, recorded or sold: music (sync and master), footage, artwork and logos, locations, talent and minors, with scope, territory and term. Signed releases will link to documents here, and a per-scene view will show what&apos;s fully cleared.</p>
+          </div>
+        )}
         {tab === "My tax documents" && <TaxDocsTab onAdd={() => setAdding({ type: "Tax document received", project: "overhead" })} />}
       </div>
       {adding && <DocModal preset={adding} onClose={() => setAdding(null)} />}

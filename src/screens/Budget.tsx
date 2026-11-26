@@ -5,7 +5,7 @@ import type { BudgetLine, Confidence } from "../lib/types";
 import { fmtDate, round2, uid } from "../lib/util";
 import { useApp } from "../store";
 import { EditCell, Empty, Modal, Plus, Progress, ProjectTag, Tile, saveTextFile } from "../components/bits";
-import { Header } from "../components/Shell";
+import { Header, MoneyTabs } from "../components/Shell";
 
 export function Budget() {
   const { data, project, money, saveBudget, newItemSignal } = useApp();
@@ -49,7 +49,7 @@ export function Budget() {
   return (
     <>
       <Header
-        title="Budget"
+        title="Bookkeeping"
         actions={
           target ? (
             <button className="btn primary" onClick={() => addLine("expense")}>
@@ -59,6 +59,7 @@ export function Budget() {
         }
       />
       <div className="content">
+        <MoneyTabs />
         <div className="tiles">
           <Tile label="Total budget" value={money(s.total)} />
           <Tile label="Paid so far" value={money(s.paid)} sub={s.total ? `${Math.round((s.paid / s.total) * 100)}% of budget` : undefined} />

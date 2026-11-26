@@ -21,6 +21,13 @@ Many Produce/
     tax/<year>/<doc>/     # W-9s, 1099s issued, tax documents received
     tax/<year>/1099s.csv  # which 1099s you issued, and when
   templates/<slug>.md     # agreement and letter templates with [Field] placeholders
+  schedule/
+    <project>.csv         # rehearsals, tech, performances, meetings
+    <project>-scenes.csv  # scene breakdown (who's in each scene)
+    conflicts.csv         # each person's unavailable dates and times
+  timeline/
+    <project>.md          # milestones and tasks, relative to opening
+    timeline-templates/<slug>.md
   .manyproduce/
     settings.json
     trash/              # nothing is hard-deleted; it lands here
@@ -157,8 +164,58 @@ Body with [Producer], [Company], [Name], [First name], [Role], [Project], [Dates
 
 New vaults start with plain-language agreement templates (artist, crew, venue rental, photo/video release) and the spec's starter letters. Fields with no value are left in brackets for you to fill in.
 
+## schedule/&lt;project&gt;.csv
+
+```
+id,date,start,end,type,title,location,called,scenes,notes
+```
+
+`start` and `end` are `HH:MM` in local time (blank = time to be decided). `location` is a venue slug or free text. `called` and `scenes` are separated by semicolons (person slugs and scene ids). `.ics` exports use floating local times, so they show at the same clock time in any calendar.
+
+## schedule/conflicts.csv
+
+```
+id,person,date,start,end,note
+```
+
+A blank `start` means the person is out all day.
+
+### Importing availability
+
+**Import availability (CSV)** on the Availability tab understands two shapes:
+
+- **Grid:** a name column, then one column per date (`12/8`, `Dec 8`, `Mon 12/8`, `2026-12-08`; a missing year means the next time that date comes around). You choose whether a marked cell (`x`, `yes`, `✓`) means available or unavailable. `busy`, `can't` and `out` always mean a conflict, and `free` or `available` never do. Cells with times narrow it: `after 6pm` (busy until 6 in an unavailable sheet), `before 2`, `2–5pm`. Anything else becomes an all-day conflict, with the text kept as the note.
+- **Rows:** columns `name, date` and optionally `start, end, note`.
+
+Names are matched to collaborators by full name, then by a unique first name, then by email. Re-importing replaces each person's older conflicts on the imported dates.
+
+## schedule/&lt;project&gt;-scenes.csv
+
+```
+id,number,title,characters
+```
+
+`characters` is semicolon-separated. Who plays whom lives in the project's `project.md` as `cast: { CARMELA: maya-ostrowski, … }`.
+
+## timeline/&lt;project&gt;.md
+
+```yaml
+---
+tasks:
+  - id: t1
+    title: Book the space
+    rel: { anchor: opening, days: -28 }   # or due: 2027-01-12 for a fixed date
+    owner: producer                       # or a person slug
+    status: To do                         # To do | Doing | Done | Skipped
+    department: Producing
+    todoist: false
+---
+```
+
+Anchors are `start`, `first_rehearsal`, `tech`, `opening`, `closing` and `end`. They come from the project's dates, or from the Schedule (the first rehearsal or read-through, the first tech, and the first and last performances). Timeline templates in `timeline/timeline-templates/` use the same task format, with `title` and `description`.
+
 ## .manyproduce/settings.json
 
-This file holds the currency, theme, low-balance `cushion`, `money_sources` (each with `name`, `opening_balance`, `opening_date`, and an optional `sponsor` slug for sponsor funds), the category and tag lists, the last selected project, the forecast length, `producer_name` and `company_name` (used in templates), `threshold_1099` (the 1099 reporting threshold, which you can change because IRS rules change) and `doc_types` (your own document types).
+This file holds the currency, theme, low-balance `cushion`, `money_sources` (each with `name`, `opening_balance`, `opening_date`, and an optional `sponsor` slug for sponsor funds), the category and tag lists, the last selected project, the forecast length, `producer_name` and `company_name` (used in templates), `threshold_1099` (the 1099 reporting threshold, which you can change because IRS rules change) `doc_types` (your own document types) and `max_hours_week` (the weekly hours-called warning; 0 = off).
 
 A source's current balance is its opening balance plus every ledger entry on that source dated on or after `opening_date`.

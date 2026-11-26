@@ -20,6 +20,8 @@ export interface Project {
   fiscal_sponsor: string; // sponsor slug or ""
   sponsor_fee_rate: number | null; // overrides the sponsor's rate when set
   builtin?: boolean; // Company overhead
+  /** Scene breakdown cast list: character name -> person slug. */
+  cast?: Record<string, string>;
   notes: string; // markdown body
 }
 
@@ -166,6 +168,7 @@ export interface Settings {
   company_name: string; // fills [Company]
   threshold_1099: number; // user-set, since IRS rules change
   doc_types: string[];
+  max_hours_week: number; // rehearsal hours per person per week before a warning; 0 = off
 }
 
 export const FISCAL_TAG = "Through fiscal sponsor";
@@ -192,6 +195,7 @@ export const DEFAULT_SETTINGS: Settings = {
   company_name: "",
   threshold_1099: 2000,
   doc_types: [],
+  max_hours_week: 0,
 };
 
 // ---- Paperwork ----
@@ -255,6 +259,66 @@ export interface Template {
   extra?: Record<string, unknown>;
 }
 
+// ---- Schedule ----
+
+export const EVENT_TYPES = ["Rehearsal", "Read-through", "Fitting", "Design meeting", "Tech", "Dress", "Performance", "Photo / video shoot", "Strike", "Other"] as const;
+
+export interface ScheduleEvent {
+  id: string;
+  project: string;
+  date: string;
+  start: string; // HH:MM
+  end: string;
+  type: string;
+  title: string;
+  location: string; // venue slug, or free text
+  called: string[]; // person slugs
+  scenes: string[]; // scene ids
+  notes: string;
+}
+
+export interface Conflict {
+  id: string;
+  person: string; // slug
+  date: string;
+  start: string; // blank = all day
+  end: string;
+  note: string;
+}
+
+export interface Scene {
+  id: string;
+  number: string; // "2.3"
+  title: string;
+  characters: string[];
+}
+
+// ---- Timeline ----
+
+export type TaskStatus = "To do" | "Doing" | "Done" | "Skipped";
+export type Anchor = "start" | "first_rehearsal" | "tech" | "opening" | "closing" | "end";
+
+export interface TimelineTask {
+  id: string;
+  title: string;
+  due: string; // absolute date, used when rel is empty
+  rel: { anchor: Anchor; days: number } | null; // e.g. opening − 56
+  owner: string; // "producer" or a person slug
+  status: TaskStatus;
+  department: string;
+  phase: string;
+  link: string; // optional link to another item, e.g. "payment:p3"
+  todoist: boolean;
+  todoist_task_id: string;
+}
+
+export interface TimelineTemplate {
+  slug: string;
+  title: string;
+  description: string;
+  tasks: Omit<TimelineTask, "id" | "status" | "todoist_task_id">[];
+}
+
 export interface VaultData {
   projects: Project[];
   ledger: LedgerEntry[];
@@ -267,4 +331,9 @@ export interface VaultData {
   docs: PaperDoc[];
   issued1099: Record<string, Issued1099[]>; // by year
   templates: Template[];
+  events: ScheduleEvent[];
+  conflicts: Conflict[];
+  scenes: Record<string, Scene[]>; // by project
+  timelines: Record<string, TimelineTask[]>; // by project
+  timelineTemplates: TimelineTemplate[];
 }

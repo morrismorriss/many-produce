@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { groupOf } from "../lib/payments";
 import { missingPaperwork } from "../lib/paperwork";
 import type { Project } from "../lib/types";
-import { uniqueSlug } from "../lib/util";
+import { fmtDate, uniqueSlug } from "../lib/util";
+import { anchorsFor, shiftPreview } from "../lib/timeline";
 import { useApp, type Screen } from "../store";
 import { Field, Modal, Plus } from "./bits";
 
@@ -11,20 +12,38 @@ export const NAV: { id: Screen; label: string; phase?: number }[] = [
   { id: "collaborators", label: "Collaborators" },
   { id: "venues", label: "Venues" },
   { id: "bookkeeping", label: "Bookkeeping" },
-  { id: "budget", label: "Budget" },
-  { id: "payments", label: "Payments" },
   { id: "shopping", label: "Shopping list", phase: 6 },
   { id: "paperwork", label: "Paperwork" },
-  { id: "schedule", label: "Schedule", phase: 5 },
-  { id: "timeline", label: "Timeline", phase: 5 },
-  { id: "stripboard", label: "Stripboard", phase: 9 },
-  { id: "clearances", label: "Clearances", phase: 9 },
-  { id: "inventory", label: "Who has what", phase: 6 },
+  { id: "schedule", label: "Schedule" }, // calendar, availability, scenes and the timeline
+  { id: "inventory", label: "Equipment log", phase: 6 },
   { id: "campaigns", label: "Campaigns", phase: 7 },
   { id: "templates", label: "Templates", phase: 7 },
   { id: "reports", label: "Reports", phase: 8 },
   { id: "settings", label: "Settings" },
 ];
+
+/** Screens that live as tabs under another sidebar item. */
+export const SCREEN_GROUP: Partial<Record<Screen, Screen>> = { budget: "bookkeeping", payments: "bookkeeping" };
+
+export const MONEY_TABS: { id: Screen; label: string }[] = [
+  { id: "bookkeeping", label: "Ledger" },
+  { id: "budget", label: "Budget" },
+  { id: "payments", label: "Payments" },
+];
+
+/** Ledger · Budget · Payments, shown at the top of each money screen. */
+export function MoneyTabs() {
+  const { screen, setScreen } = useApp();
+  return (
+    <div className="chips tabs" role="tablist" aria-label="Bookkeeping" style={{ marginBottom: 16 }}>
+      {MONEY_TABS.map((t) => (
+        <button key={t.id} role="tab" className="chip" aria-selected={screen === t.id} aria-pressed={screen === t.id} onClick={() => setScreen(t.id)}>
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function Sidebar() {
   const { data, project, setProject, screen, setScreen, allPayments, today, people, } = useSidebarData();
@@ -36,8 +55,7 @@ export function Sidebar() {
     const overdue = open.filter((p) => groupOf(p, today) === "Overdue").length;
     const ledger = data.ledger.filter((e) => !project || (e.project_alloc[project] ?? 0) > 0).length;
     return {
-      payments: open.length ? { text: overdue ? `${overdue} overdue` : `${open.length} open`, alert: overdue > 0 } : undefined,
-      bookkeeping: ledger ? { text: String(ledger) } : undefined,
+      bookkeeping: overdue ? { text: `${overdue} overdue`, alert: true } : ledger ? { text: String(ledger) } : undefined,
       collaborators: people ? { text: String(people) } : undefined,
       paperwork: (() => { const n = missingPaperwork(data, project, today).length; return n ? { text: `${n} missing`, alert: true } : undefined; })(),
       venues: data.venues.length ? { text: String(data.venues.filter((v) => !project || v.projects.includes(project)).length) } : undefined,
@@ -77,8 +95,8 @@ export function Sidebar() {
       <div className="nav">
         {NAV.map((n, i) => (
           <div key={n.id}>
-            {(i === 6 || i === 16) && <div className="nav-sep" />}
-            <button aria-current={screen === n.id ? "page" : undefined} onClick={() => setScreen(n.id)}>
+            {(i === 6 || i === NAV.length - 1) && <div className="nav-sep" />}
+            <button aria-current={screen === n.id || SCREEN_GROUP[screen] === n.id ? "page" : undefined} onClick={() => setScreen(n.id)}>
               <span>{n.label}</span>
               {n.phase ? (
                 <span className="later" title={`Planned for build phase ${n.phase}`}>soon</span>
@@ -122,6 +140,7 @@ export function ProjectModal({ onClose, existing }: { onClose: () => void; exist
     },
   );
   const set = <K extends keyof Project>(k: K, v: Project[K]) => setP((x) => ({ ...x, [k]: v }));
+  const moving = existing ? shiftPreview(data.timelines[existing.slug] ?? [], "opening", anchorsFor(existing, data.events).opening, p.opening || anchorsFor({ ...existing, opening: "" }, data.events).opening) : [];
   const submit = async () => {
     if (!p.name.trim()) return;
     const slug = existing ? existing.slug : uniqueSlug(p.name, data.projects.map((x) => x.slug));
@@ -190,6 +209,11 @@ export function ProjectModal({ onClose, existing }: { onClose: () => void; exist
           <textarea value={p.notes} onChange={(e) => set("notes", e.target.value)} />
         </Field>
       </div>
+      {moving.length > 0 && (
+        <div className="note info">
+          Moving opening will move {moving.length} timeline task{moving.length > 1 ? "s" : ""} with it, e.g. {moving.slice(0, 3).map((m) => `"${m.task.title}" ${fmtDate(m.before)} → ${fmtDate(m.after)}`).join("; ")}.
+        </div>
+      )}
       <div className="toolbar">
         {existing && !existing.builtin && (
           <button
@@ -258,6 +282,8 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     const go = (s: Screen) => () => setScreen(s);
     return [
       ...NAV.map((n) => ({ label: n.label, hint: "Screen", run: go(n.id) })),
+      { label: "Budget", hint: "Bookkeeping", run: go("budget") },
+      { label: "Payments", hint: "Bookkeeping", run: go("payments") },
       ...data.projects.map((p) => ({ label: p.name, hint: "Project", run: () => setProject(p.slug) })),
       ...data.people.map((p) => ({ label: p.name, hint: p.roles.join(", ") || "Person", run: () => { setScreen("collaborators"); openDrawer({ kind: "person", slug: p.slug }); } })),
       ...data.venues.map((v) => ({ label: v.name, hint: "Venue", run: () => { setScreen("venues"); openDrawer({ kind: "venue", slug: v.slug }); } })),

@@ -19,7 +19,9 @@ import {
 import type { VaultFS } from "./fs";
 import { docFromMd, docToMd, issuedFromCSV, issuedToCSV, templateFromMd, templateToMd } from "./paperwork";
 import { STARTER_TEMPLATES } from "./starterTemplates";
-import type { Issued1099, PaperDoc, Template } from "./types";
+import type { Conflict, Issued1099, PaperDoc, Scene, ScheduleEvent, Template, TimelineTask, TimelineTemplate } from "./types";
+import { conflictsFromCSV, conflictsToCSV, eventsFromCSV, eventsToCSV, scenesFromCSV, scenesToCSV } from "./schedule";
+import { STARTER_TIMELINE_TEMPLATES, timelineFromMd, timelineTemplateFromMd, timelineTemplateToMd, timelineToMd } from "./timeline";
 
 export const SETTINGS_PATH = ".manyproduce/settings.json";
 
@@ -72,7 +74,7 @@ function extraKeys(d: Record<string, unknown>, known: string[]): Record<string, 
   return Object.keys(out).length ? out : undefined;
 }
 
-const PROJECT_KEYS = ["slug", "name", "color", "subtitle", "status", "type", "start", "end", "opening", "city", "fiscal_sponsor", "sponsor_fee_rate"];
+const PROJECT_KEYS = ["cast", "slug", "name", "color", "subtitle", "status", "type", "start", "end", "opening", "city", "fiscal_sponsor", "sponsor_fee_rate"];
 const PERSON_KEYS = ["name", "roles", "projects", "email", "phone", "city", "rate", "rate_type", "status", "pronouns", "payment_method", "w9_on_file", "w9_date", "notes"];
 const VENUE_KEYS = ["name", "type", "city", "capacity", "rate", "tech_notes", "status", "projects", "next_step", "contact", "hold_dates", "coi_on_file"];
 const SPONSOR_KEYS = ["name", "fee_rate", "fee_applies_to", "contact", "account_url", "review_required_for", "report_schedule"];
@@ -107,6 +109,7 @@ function projectFromDoc(slug: string, d: Record<string, unknown>, body: string):
     fiscal_sponsor: str(d.fiscal_sponsor),
     sponsor_fee_rate: d.sponsor_fee_rate === undefined || d.sponsor_fee_rate === null || d.sponsor_fee_rate === "" ? null : Number(d.sponsor_fee_rate),
     builtin: slug === OVERHEAD_SLUG,
+    cast: d.cast && typeof d.cast === "object" ? Object.fromEntries(Object.entries(d.cast as Record<string, unknown>).map(([k, v]) => [k, String(v)])) : undefined,
     notes: body.trim(),
     extra: extraKeys(d, PROJECT_KEYS),
   };
@@ -193,6 +196,9 @@ export function sponsorToMd(s: Sponsor): string {
 
 /** Make sure the built-in pieces exist (overhead project, sponsor presets, settings). */
 export async function initVault(fs: VaultFS): Promise<void> {
+  if (!(await fs.list("timeline/timeline-templates")).length) {
+    for (const t of STARTER_TIMELINE_TEMPLATES) await fs.write(`timeline/timeline-templates/${t.slug}.md`, timelineTemplateToMd(t));
+  }
   if (!(await fs.list("templates")).length) {
     for (const t of STARTER_TEMPLATES) await fs.write(`templates/${t.slug}.md`, templateToMd(t));
   }
@@ -265,7 +271,31 @@ export async function loadVault(fs: VaultFS): Promise<VaultData> {
     if (text !== null) templates.push(templateFromMd(e.name.replace(/\.md$/, ""), text));
   }
 
-  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates };
+  // Schedule: schedule/<project>.csv, schedule/<project>-scenes.csv, schedule/conflicts.csv
+  const events: ScheduleEvent[] = [];
+  const scenes: Record<string, Scene[]> = {};
+  let conflicts: Conflict[] = [];
+  for (const e of await fs.list("schedule")) {
+    if (e.is_dir || !e.name.endsWith(".csv")) continue;
+    const text = (await fs.read(`schedule/${e.name}`)) ?? "";
+    if (e.name === "conflicts.csv") conflicts = conflictsFromCSV(text);
+    else if (e.name.endsWith("-scenes.csv")) scenes[e.name.slice(0, -"-scenes.csv".length)] = scenesFromCSV(text);
+    else events.push(...eventsFromCSV(e.name.slice(0, -4), text));
+  }
+
+  // Timeline: timeline/<project>.md and timeline/timeline-templates/<slug>.md
+  const timelines: Record<string, TimelineTask[]> = {};
+  for (const e of await fs.list("timeline")) {
+    if (e.is_dir || !e.name.endsWith(".md")) continue;
+    timelines[e.name.slice(0, -3)] = timelineFromMd((await fs.read(`timeline/${e.name}`)) ?? "").tasks;
+  }
+  const timelineTemplates: TimelineTemplate[] = [];
+  for (const e of await fs.list("timeline/timeline-templates")) {
+    if (e.is_dir || !e.name.endsWith(".md")) continue;
+    timelineTemplates.push(timelineTemplateFromMd(e.name.slice(0, -3), (await fs.read(`timeline/timeline-templates/${e.name}`)) ?? ""));
+  }
+
+  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates, events, conflicts, scenes, timelines, timelineTemplates };
 }
 
 // ---- writers ----
@@ -285,4 +315,9 @@ export const saveSponsor = (fs: VaultFS, s: Sponsor) => fs.write(`sponsors/${s.s
 export const saveDoc = (fs: VaultFS, d: PaperDoc) => fs.write(`${d.path}/paperwork.md`, docToMd(d));
 export const saveIssued1099 = (fs: VaultFS, year: string, rows: Issued1099[]) => fs.write(`paperwork/tax/${year}/1099s.csv`, issuedToCSV(rows));
 export const saveTemplate = (fs: VaultFS, t: Template) => fs.write(`templates/${t.slug}.md`, templateToMd(t));
+export const saveEvents = (fs: VaultFS, project: string, all: ScheduleEvent[]) => fs.write(`schedule/${project}.csv`, eventsToCSV(all.filter((e) => e.project === project)));
+export const saveConflicts = (fs: VaultFS, c: Conflict[]) => fs.write("schedule/conflicts.csv", conflictsToCSV(c));
+export const saveScenes = (fs: VaultFS, project: string, s: Scene[]) => fs.write(`schedule/${project}-scenes.csv`, scenesToCSV(s));
+export const saveTimeline = (fs: VaultFS, project: string, tasks: TimelineTask[]) => fs.write(`timeline/${project}.md`, timelineToMd(tasks));
+export const saveTimelineTemplate = (fs: VaultFS, t: TimelineTemplate) => fs.write(`timeline/timeline-templates/${t.slug}.md`, timelineTemplateToMd(t));
 export const saveSettings = (fs: VaultFS, s: Settings) => fs.write(SETTINGS_PATH, JSON.stringify(s, null, 2));

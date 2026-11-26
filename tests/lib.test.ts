@@ -12,7 +12,10 @@ import {
   upsertWithFees,
 } from "../src/lib/ledger";
 import { groupOf, ledgerEntryForPayment, paymentsFromMd, paymentsToICS, paymentsToMd } from "../src/lib/payments";
-import { FISCAL_TAG, type LedgerEntry, type Payment, type Person, type Project, type Sponsor } from "../src/lib/types";
+import { FISCAL_TAG, type LedgerEntry, type Payment, type Person, type Project, type ScheduleEvent, type Sponsor } from "../src/lib/types";
+import { matchNames, mergeConflicts, parseAvailabilityCSV, parseLooseDate, parseLooseTime } from "../src/lib/availabilityImport";
+import { bestDates, calledForScenes, eventsToICS, hoursTally, parseScenesPaste, scheduleWarnings } from "../src/lib/schedule";
+import { STARTER_TIMELINE_TEMPLATES, anchorsFor, applyTemplate, relLabel, resolveDue, shiftPreview, timelineFromMd, timelineToMd } from "../src/lib/timeline";
 import { blankDoc, docFromMd, docToMd, fillTemplate, list1099CSV, markdownToHtml, missingPaperwork, paymentsForSchedule, splitFee, totals1099 } from "../src/lib/paperwork";
 import { allocValid, formatAlloc, parseAlloc, shareOf, slugify, weekStart } from "../src/lib/util";
 import { loadVault, personToMd } from "../src/lib/vault";
@@ -299,5 +302,107 @@ describe("paperwork", () => {
     const v = await loadVault(new MemoryFS({}));
     expect(v.templates.map((t) => t.slug)).toContain("artist-agreement");
     expect(markdownToHtml("# Title\n\nSome **bold** text\n\n- one\n- two")).toBe("<h1>Title</h1>\n<p>Some <strong>bold</strong> text</p>\n<ul>\n<li>one</li>\n<li>two</li>\n</ul>");
+  });
+});
+
+describe("availability import", () => {
+  const today = "2026-11-26";
+  const people = [
+    { slug: "ana-reyes", name: "Ana Reyes", email: "ana@example.com" },
+    { slug: "jun-park", name: "Jun Park", email: "" },
+    { slug: "maya-ostrowski", name: "Maya Ostrowski", email: "" },
+  ] as Person[];
+
+  it("reads loose dates and times", () => {
+    expect(parseLooseDate("12/8", today)).toBe("2026-12-08");
+    expect(parseLooseDate("1/5", today)).toBe("2027-01-05"); // next occurrence
+    expect(parseLooseDate("Mon 12/8/2026", today)).toBe("2026-12-08");
+    expect(parseLooseDate("Dec 8", today)).toBe("2026-12-08");
+    expect(parseLooseDate("8 Jan 2027", today)).toBe("2027-01-08");
+    expect(parseLooseDate("2027-02-01", today)).toBe("2027-02-01");
+    expect(parseLooseDate("Name", today)).toBeNull();
+    expect(parseLooseTime("6pm")).toBe("18:00");
+    expect(parseLooseTime("6:30")).toBe("18:30");
+    expect(parseLooseTime("10")).toBe("10:00");
+    expect(parseLooseTime("12am")).toBe("00:00");
+  });
+
+  it("turns an 'unavailable' grid into conflicts", () => {
+    const csv = "Name,12/8,12/9,12/10\nAna Reyes,x,,after 6pm\nJun,,busy,2-5pm\nSam Lee,,,x\n";
+    const p = parseAvailabilityCSV(csv, "unavailable", today);
+    expect(p.shape).toBe("grid");
+    expect(p.dates).toEqual(["2026-12-08", "2026-12-09", "2026-12-10"]);
+    const ana = p.conflicts.filter((c) => c.name === "Ana Reyes");
+    expect(ana).toEqual([
+      { name: "Ana Reyes", date: "2026-12-08", start: "", end: "", note: "" },
+      { name: "Ana Reyes", date: "2026-12-10", start: "18:00", end: "23:59", note: "after 6pm" },
+    ]);
+    const jun = p.conflicts.filter((c) => c.name === "Jun");
+    expect(jun.map((c) => [c.date, c.start, c.end])).toEqual([["2026-12-09", "", ""], ["2026-12-10", "14:00", "17:00"]]);
+    const m = matchNames(p.names, people);
+    expect(m).toEqual({ "Ana Reyes": "ana-reyes", Jun: "jun-park", "Sam Lee": null });
+  });
+
+  it("turns an 'available' grid into conflicts for the unmarked days", () => {
+    const p = parseAvailabilityCSV("Name,Dec 8,Dec 9\nMaya Ostrowski,yes,\n", "available", today);
+    expect(p.conflicts).toEqual([{ name: "Maya Ostrowski", date: "2026-12-09", start: "", end: "", note: "Not marked available" }]);
+  });
+
+  it("reads one-row-per-conflict files and replaces old conflicts on re-import", () => {
+    const p = parseAvailabilityCSV("name,date,start,end,note\nAna Reyes,12/8,18:00,21:00,class\nJun Park,nope,,,\n", "unavailable", today);
+    expect(p.shape).toBe("rows");
+    expect(p.conflicts).toEqual([{ name: "Ana Reyes", date: "2026-12-08", start: "18:00", end: "21:00", note: "class" }]);
+    expect(p.warnings[0]).toContain("Row 3");
+    const old = [
+      { id: "1", person: "ana-reyes", date: "2026-12-08", start: "", end: "", note: "old" },
+      { id: "2", person: "ana-reyes", date: "2026-12-20", start: "", end: "", note: "keep" },
+    ];
+    const { next, added, replaced } = mergeConflicts(old, p, matchNames(p.names, people));
+    expect(replaced.map((c) => c.id)).toEqual(["1"]);
+    expect(added).toHaveLength(1);
+    expect(next.map((c) => c.note).sort()).toEqual(["class", "keep"]);
+  });
+});
+
+describe("schedule + timeline", () => {
+  const ev = (x: Partial<ScheduleEvent>): ScheduleEvent => ({ id: "e", project: "a", date: "2026-12-08", start: "18:00", end: "21:00", type: "Rehearsal", title: "", location: "", called: [], scenes: [], notes: "", ...x });
+  it("finds conflicts, double bookings and too many hours", () => {
+    const people = [{ slug: "ana", name: "Ana" }] as Person[];
+    const events = [
+      ev({ id: "1", called: ["ana"], location: "hall" }),
+      ev({ id: "2", project: "b", start: "20:00", end: "22:00", location: "hall" }),
+      ev({ id: "3", date: "2026-12-09", called: ["ana"] }),
+    ];
+    const conflicts = [{ id: "c", person: "ana", date: "2026-12-08", start: "19:00", end: "20:00", note: "class" }];
+    const w = scheduleWarnings(events, conflicts, people, [], 5);
+    expect(w.filter((x) => x.kind === "conflict").map((x) => x.event)).toEqual(["1"]);
+    expect(w.filter((x) => x.kind === "double-booked").map((x) => x.event).sort()).toEqual(["1", "2"]);
+    expect(w.some((x) => x.kind === "hours" && x.message.includes("6 hours"))).toBe(true);
+    expect(hoursTally(events, "", "")).toEqual({ ana: { hours: 6, calls: 2 } });
+  });
+  it("calls the right people for a scene and finds the best dates", () => {
+    const scenes = parseScenesPaste("1.1 Kitchen: ANA, Ben\n2.3, Ben, Cleo");
+    expect(scenes.map((s) => [s.number, s.title, s.characters])).toEqual([["1.1", "Kitchen", ["ANA", "Ben"]], ["2.3", "", ["Ben", "Cleo"]]]);
+    expect(calledForScenes([scenes[1].id], scenes, { Ben: "ben", Cleo: "cleo", Ana: "ana" }).sort()).toEqual(["ben", "cleo"]);
+    expect(calledForScenes([scenes[0].id], scenes, { Ana: "ana" })).toEqual(["ana"]); // case-insensitive
+    const best = bestDates(["ana", "ben"], ["2026-12-08", "2026-12-09"], "18:00", "21:00", [{ id: "c", person: "ana", date: "2026-12-08", start: "", end: "", note: "" }]);
+    expect(best[0]).toEqual({ date: "2026-12-09", free: ["ana", "ben"], busy: [] });
+  });
+  it("exports a person's calls as .ics", () => {
+    const ics = eventsToICS([ev({ id: "1", called: ["ana"] }), ev({ id: "2", called: ["ben"] })], "ana", [], []);
+    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(1);
+    expect(ics).toContain("DTSTART:20261208T180000");
+  });
+  it("resolves relative dates and previews a move", () => {
+    const p = { slug: "a", opening: "2027-03-01", start: "", end: "" } as Project;
+    const a = anchorsFor(p, [ev({ type: "Performance", date: "2027-03-01" }), ev({ type: "Performance", date: "2027-03-10" })]);
+    expect(a.closing).toBe("2027-03-10");
+    const tasks = applyTemplate(STARTER_TIMELINE_TEMPLATES[0]);
+    expect(resolveDue(tasks[0], a)).toBe("2027-02-01");
+    expect(relLabel(tasks[0].rel)).toBe("Opening − 4 weeks");
+    const prev = shiftPreview(tasks, "opening", "2027-03-01", "2027-03-08");
+    expect(prev[0]).toMatchObject({ before: "2027-02-01", after: "2027-02-08" });
+    const md = timelineToMd(tasks);
+    expect(timelineFromMd(md).tasks).toEqual(tasks);
   });
 });

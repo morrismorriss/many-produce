@@ -26,9 +26,10 @@ import { checkoutsFromCSV, checkoutsToCSV, itemsFromCSV, itemsToCSV } from "./in
 import type { Campaign, Checkout, InventoryItem, ShoppingItem } from "./types";
 import { campaignFromMd, campaignToMd } from "./campaigns";
 import { dailyFromMd, dailyToMd, houseFromMd, houseToMd, savedReportFromMd, savedReportToMd } from "./reports";
-import type { Board, Clearance, DailyReport, HouseReport, SavedReport, StripScene, VenueDeal } from "./types";
+import type { Board, Clearance, DailyReport, HouseReport, SavedReport, StripScene, VenueDeal, HubLink, HubTodo } from "./types";
 import { boardFromJSON, normalizeBoard, stripsFromCSV, stripsToCSV } from "./stripboard";
 import { clearancesFromCSV, clearancesToCSV } from "./clearances";
+import { LINKS_PATH, TODOS_PATH, linksFromCSV, linksToCSV, todosFromCSV, todosToCSV } from "./hub";
 import { STARTER_TIMELINE_TEMPLATES, timelineFromMd, timelineTemplateFromMd, timelineTemplateToMd, timelineToMd } from "./timeline";
 
 export const SETTINGS_PATH = ".manyproduce/settings.json";
@@ -369,7 +370,10 @@ async function loadVaultInner(fs: VaultFS): Promise<VaultData> {
     clearances[slug] = clearancesFromCSV(slug, (await fs.read(`clearances/${e.name}`)) ?? "");
   }
 
-  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates, events, conflicts, scenes, timelines, timelineTemplates, shopping, inventory, checkouts, campaigns, reports, houseReports, dailyReports, strips, boards, clearances };
+  const todos = todosFromCSV((await fs.read(TODOS_PATH)) ?? "");
+  const links = linksFromCSV((await fs.read(LINKS_PATH)) ?? "");
+
+  return { projects, ledger, budgets, payments, people, venues, sponsors, settings, docs, issued1099, templates, events, conflicts, scenes, timelines, timelineTemplates, shopping, inventory, checkouts, campaigns, reports, houseReports, dailyReports, strips, boards, clearances, todos, links };
 }
 
 // ---- writers ----
@@ -403,5 +407,7 @@ export const saveHouseReport = (fs: VaultFS, h: HouseReport) => fs.write(h.path,
 export const saveDailyReport = (fs: VaultFS, r: DailyReport, people: import("./types").Person[]) => fs.write(r.path, dailyToMd(r, people));
 export const saveStrips = (fs: VaultFS, project: string, s: StripScene[]) => fs.write(`stripboard/${project}/scenes.csv`, stripsToCSV(s));
 export const saveBoard = (fs: VaultFS, project: string, b: Board) => fs.write(`stripboard/${project}/board.json`, JSON.stringify(b, null, 2));
+export const saveTodos = (fs: VaultFS, t: HubTodo[]) => fs.write(TODOS_PATH, todosToCSV(t));
+export const saveLinks = (fs: VaultFS, l: HubLink[]) => fs.write(LINKS_PATH, linksToCSV(l));
 export const saveClearances = (fs: VaultFS, project: string, c: Clearance[]) => fs.write(`clearances/${project}.csv`, clearancesToCSV(c));
 export const saveSettings = (fs: VaultFS, s: Settings) => fs.write(SETTINGS_PATH, JSON.stringify(s, null, 2));

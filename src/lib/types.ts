@@ -631,4 +631,26 @@ export interface VaultData {
   strips: Record<string, StripScene[]>; // by project
   boards: Record<string, Board>; // by project
   clearances: Record<string, Clearance[]>; // by project
+  todos: HubTodo[]; // Dashboard quick hub
+  links: HubLink[];
+}
+
+// ---- Quick hub (Dashboard) ----
+
+export interface HubTodo {
+  id: string;
+  text: string;
+  done: boolean;
+  project: string; // project slug or "" for general
+  due: string; // YYYY-MM-DD or ""
+  created: string;
+  done_date: string;
+}
+
+export interface HubLink {
+  id: string;
+  title: string;
+  url: string;
+  group: string; // e.g. "Design", "Fundraising"
+  notes: string;
 }

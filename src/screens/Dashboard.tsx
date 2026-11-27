@@ -16,6 +16,7 @@ import { summarize as shopSummary } from "../lib/shopping";
 import { useGearWarnings } from "./Equipment";
 import { missingDailyReports, missingHouseReports } from "../lib/reports";
 import { clearanceWarnings } from "../lib/clearances";
+import { QuickHub } from "../components/QuickHub";
 
 export function Dashboard() {
   const app = useApp();
@@ -102,6 +103,8 @@ export function Dashboard() {
           <Tile label="Payments overdue" value={overdue.length} alert={overdue.length > 0} sub={overdue.length ? money(overdue.reduce((s, p) => s + p.amount * shareOf(p.project_alloc, project), 0)) : "All caught up"} />
           <Tile label="Paperwork missing" value={missing.length} alert={missing.length > 0} sub={missing.length ? "Agreements, W-9s, COIs…" : "All on file"} />
         </div>
+
+        <QuickHub />
 
         <section className="card" aria-label="Cash flow forecast">
           <div className="card-head">

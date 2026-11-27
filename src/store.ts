@@ -8,7 +8,7 @@ import { removeWithFees, upsertWithFees } from "./lib/ledger";
 import { ledgerEntryForPayment } from "./lib/payments";
 import { newDocPath, paymentsForSchedule } from "./lib/paperwork";
 import { EMPTY_STATE, deleteAllTasks, desktopApi, runSync, wantedTasks, type SyncState } from "./lib/todoist";
-import type { Board, Campaign, Clearance, DailyReport, HouseReport, SavedReport, StripScene } from "./lib/types";
+import type { HubLink, HubTodo, Board, Campaign, Clearance, DailyReport, HouseReport, SavedReport, StripScene } from "./lib/types";
 import { newCampaignPath } from "./lib/campaigns";
 import type { Checkout, Conflict, InventoryItem, Scene, ScheduleEvent, ShoppingItem, TimelineTask, TimelineTemplate } from "./lib/types";
 import { producerPurchaseEntry, reimbursementPayment } from "./lib/shopping";
@@ -106,6 +106,9 @@ interface State {
   saveStrips: (project: string, s: StripScene[]) => Promise<void>;
   saveBoard: (project: string, b: Board) => Promise<void>;
   saveClearances: (project: string, c: Clearance[]) => Promise<void>;
+  /** Dashboard quick hub: the whole list is written each time. */
+  saveTodos: (t: HubTodo[]) => Promise<void>;
+  saveLinks: (l: HubLink[]) => Promise<void>;
   /** Write a CSV import in one go. Returns a function that undoes it. */
   applyImport: (kind: ImportKind, plan: ImportPlan<AnyRecord>) => Promise<() => Promise<void>>;
   /** Add ledger entries in one write (statement imports). Returns an undo. */
@@ -546,6 +549,14 @@ export const useStore = create<State>()((set, get) => {
     saveClearances: async (project, c) => {
       patch((d) => ({ clearances: { ...d.clearances, [project]: c } }));
       await vault.saveClearances(get().fs, project, c).catch(fail);
+    },
+    saveTodos: async (t) => {
+      patch(() => ({ todos: t }));
+      await vault.saveTodos(get().fs, t).catch(fail);
+    },
+    saveLinks: async (l) => {
+      patch(() => ({ links: l }));
+      await vault.saveLinks(get().fs, l).catch(fail);
     },
 
     importEntries: async (entries) => {

@@ -40,6 +40,9 @@ Many Produce/
   timeline/
     <project>.md          # milestones and tasks, relative to opening
     timeline-templates/<slug>.md
+  hub/
+    todos.csv             # the Dashboard to-do list
+    links.csv             # the Dashboard links (Canva, fundraising page, shared drive…)
   .manyproduce/
     todoist.json          # Todoist sync state: which Todoist project, section and task each item maps to
     settings.json
@@ -367,3 +370,15 @@ Custom themes are JSON files in a folder shared by the Many apps:
 This file holds the currency, theme, low-balance `cushion`, `money_sources` (each with `name`, `opening_balance`, `opening_date`, and an optional `sponsor` slug for sponsor funds), the category and tag lists, the last selected project, the forecast length, `producer_name` and `company_name` (used in templates), `threshold_1099` (the 1099 reporting threshold, which you can change because IRS rules change) `doc_types` (your own document types) `max_hours_week` (the weekly hours-called warning; 0 = off) and `todoist` (`enabled`, `parent_project_id`, the per-kind `sync` toggles, `last_sync`, `last_error`).
 
 A source's current balance is its opening balance plus every ledger entry on that source dated on or after `opening_date`.
+
+## hub/todos.csv and hub/links.csv
+
+The Dashboard's quick hub.
+
+```
+id,text,done,project,due,created,done_date
+id,title,url,group,notes
+```
+
+- `done` is `yes` or blank. `project` is a project slug, or blank for a general to-do (shown under every project). `due` is optional.
+- `url` must be a web address (`https://…`) or `mailto:`. `group` is any label (`Design`, `Fundraising`); links with no group are listed last.

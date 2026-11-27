@@ -26,6 +26,7 @@ import { campaignToMd } from "./campaigns";
 import { dailyToMd, houseToMd } from "./reports";
 import { emptyElements, stripsToCSV } from "./stripboard";
 import { clearancesToCSV, blankClearance } from "./clearances";
+import { linksToCSV, todosToCSV } from "./hub";
 import type { StripScene } from "./types";
 import type { DailyReport, HouseReport } from "./types";
 import { STARTER_TIMELINE_TEMPLATES, applyTemplate, timelineToMd } from "./timeline";
@@ -377,6 +378,21 @@ export function sampleVault(today = todayISO()): Record<string, string> {
     effective: d(-340), expires: d(25),
   });
   files["paperwork/tax/" + today.slice(0, 4) + "/1099s.csv"] = "payee,issued_date,notes\n";
+
+  // Dashboard quick hub
+  files["hub/todos.csv"] = todosToCSV([
+    { id: "td1", text: "Send rehearsal report to the director", done: false, project: "prodigy", due: d(1), created: d(-2), done_date: "" },
+    { id: "td2", text: "Update the Giving Tuesday page with the matching gift", done: false, project: "prodigy", due: d(3), created: d(-1), done_date: "" },
+    { id: "td3", text: "Renew the website domain", done: false, project: "", due: "", created: d(-6), done_date: "" },
+    { id: "td4", text: "Post the audition notice", done: true, project: "prodigy", due: "", created: d(-20), done_date: d(-10) },
+  ]);
+  files["hub/links.csv"] = linksToCSV([
+    { id: "ln1", title: "Canva: poster and social", url: "https://www.canva.com", group: "Design", notes: "" },
+    { id: "ln2", title: "Fundraising page", url: "https://fundrazr.com", group: "Fundraising", notes: "Giving Tuesday campaign" },
+    { id: "ln3", title: "Fractured Atlas dashboard", url: "https://www.fracturedatlas.org", group: "Fundraising", notes: "" },
+    { id: "ln4", title: "Shared production drive", url: "https://drive.google.com", group: "Files", notes: "Scripts, design packets" },
+    { id: "ln5", title: "Ticketing", url: "https://www.eventbrite.com", group: "", notes: "" },
+  ]);
 
   return files;
 }

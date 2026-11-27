@@ -1,7 +1,8 @@
 // Todoist sync. Many Produce keeps the full plan; Todoist holds the producer's
 // own to-dos. One Todoist project per Many Produce project (under a parent you
-// choose), with sections for Payments, Paperwork, Timeline, Shopping,
-// Campaigns and Reports.
+// choose), with sections for To do (the Dashboard list), Payments, Paperwork,
+// Timeline, Shopping, Campaigns and Reports. General Dashboard to-dos go to
+// the Company overhead project.
 //
 // Sync is a diff between what the app wants in Todoist and what it last put
 // there (kept in .manyproduce/todoist.json), so anything changed while offline
@@ -10,9 +11,9 @@
 import { missingPaperwork } from "./paperwork";
 import { missingHouseReports } from "./reports";
 import { anchorsFor, resolveDue } from "./timeline";
-import type { TodoistSettings, VaultData } from "./types";
+import { OVERHEAD_SLUG, type TodoistSettings, type VaultData } from "./types";
 
-export const SECTIONS = ["Payments", "Paperwork", "Timeline", "Shopping", "Campaigns", "Reports"] as const;
+export const SECTIONS = ["To do", "Payments", "Paperwork", "Timeline", "Shopping", "Campaigns", "Reports"] as const;
 export type Section = (typeof SECTIONS)[number];
 
 export interface WantedTask {
@@ -41,6 +42,14 @@ export function wantedTasks(data: VaultData, s: TodoistSettings, today: string, 
   const live = new Set(projects.map((p) => p.slug));
   const first = (alloc: Record<string, number>) => Object.keys(alloc).find((k) => live.has(k)) ?? "";
 
+  if (s.sync.hub) {
+    for (const t of data.todos) {
+      if (t.done) continue;
+      // General to-dos, and ones whose project is closed or gone, go to Company overhead.
+      const proj = live.has(t.project) ? t.project : OVERHEAD_SLUG;
+      out.push({ key: `hub:${t.id}`, project: proj, section: "To do", content: t.text, due: t.due, description: "Many Produce · Dashboard → To do" });
+    }
+  }
   if (s.sync.timeline) {
     for (const p of projects) {
       const a = anchorsFor(p, data.events);

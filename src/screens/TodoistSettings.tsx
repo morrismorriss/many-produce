@@ -5,6 +5,7 @@ import type { TodoistSettings as TS } from "../lib/types";
 import { useApp } from "../store";
 
 const TOGGLES: { key: keyof TS["sync"]; label: string }[] = [
+  { key: "hub", label: "Dashboard to-do list (general to-dos go to Company overhead)" },
   { key: "timeline", label: "Timeline tasks you own" },
   { key: "payments", label: "Payment due dates" },
   { key: "paperwork", label: "Paperwork follow-ups (send contract, chase signature, request W-9)" },
@@ -62,7 +63,7 @@ export function TodoistSettings() {
     <section className="card">
       <div className="card-head"><h2>Todoist</h2>{t.enabled && <span className="pill green">Syncing</span>}</div>
       <p className="small muted">
-        Optional. Many Produce keeps the full plan; Todoist holds your own to-dos. Each project gets a Todoist project (inside a parent you choose) with sections for Payments, Paperwork, Timeline, Shopping, Campaigns and Reports. It syncs when the app opens and every 15 minutes. Edits you make in the app win; finishing a task in Todoist marks it done here (a payment is only marked paid after you confirm the amount). Tasks owned by other collaborators stay in the app.
+        Optional. Many Produce keeps the full plan; Todoist holds your own to-dos. Each project gets a Todoist project (inside a parent you choose) with sections for To do (your Dashboard list), Payments, Paperwork, Timeline, Shopping, Campaigns and Reports. It syncs when the app opens and every 15 minutes. Edits you make in the app win; finishing a task in Todoist marks it done here (a payment is only marked paid after you confirm the amount). Tasks owned by other collaborators stay in the app.
       </p>
       {!desktop ? (
         <p className="note small">Todoist sync works in the desktop app, where your token is kept in the operating system&apos;s keychain.</p>

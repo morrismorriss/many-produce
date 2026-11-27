@@ -162,7 +162,10 @@ export const useStore = create<State>()((set, get) => {
       for (const key of res.completedInTodoist) {
         const [kind, ...rest] = key.split(":");
         const d = get().data;
-        if (kind === "timeline") {
+        if (kind === "hub") {
+          const list = d.todos;
+          if (list.some((t) => t.id === rest[0] && !t.done)) await get().saveTodos(list.map((t) => (t.id === rest[0] ? { ...t, done: true, done_date: today } : t)));
+        } else if (kind === "timeline") {
           const [slug, id] = rest;
           const list = d.timelines[slug] ?? [];
           if (list.some((t) => t.id === id)) await get().saveTimeline(slug, list.map((t) => (t.id === id ? { ...t, status: "Done" as const } : t)));

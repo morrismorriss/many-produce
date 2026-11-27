@@ -717,9 +717,30 @@ describe("todoist sync", () => {
     expect(r2.created).toBe(wanted.filter((w) => w.project === "prodigy").length);
   });
 
+  it("syncs Dashboard to-dos into a To do section, general ones under Company overhead", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    v.todos.push({ id: "tdx", text: "Old show wrap-up", done: false, project: "no-such-project", due: "", created: "", done_date: "" });
+    const settings = { ...v.settings.todoist, enabled: true, parent_project_id: "" };
+    const hub = wantedTasks(v, settings, today, String).filter((w) => w.key.startsWith("hub:"));
+    expect(hub.every((w) => w.section === "To do")).toBe(true);
+    expect(hub.find((w) => w.key === "hub:td1")).toMatchObject({ project: "prodigy", content: "Send rehearsal report to the director" });
+    expect(hub.find((w) => w.key === "hub:td3")!.project).toBe("overhead"); // general
+    expect(hub.find((w) => w.key === "hub:tdx")!.project).toBe("overhead"); // unknown project
+    expect(hub.some((w) => w.key === "hub:td4")).toBe(false); // already done
+
+    const t = fakeTodoist();
+    const names = Object.fromEntries(v.projects.map((p) => [p.slug, p.name]));
+    const r1 = await runSync(t.api, hub, names, settings, EMPTY_STATE);
+    expect(t.sections.filter((s) => s.name === "To do")).toHaveLength(2);
+    t.tasks.find((x) => x.id === r1.state.tasks["hub:td1"].id)!.checked = true;
+    const r2 = await runSync(t.api, hub, names, settings, r1.state);
+    expect(r2.completedInTodoist).toEqual(["hub:td1"]);
+    expect(wantedTasks(v, { ...settings, sync: { ...settings.sync, hub: false } }, today, String).some((w) => w.key.startsWith("hub:"))).toBe(false);
+  });
+
   it("respects the sync toggles", async () => {
     const v = await loadVault(new MemoryFS(sampleVault(today)));
-    const off = { ...v.settings.todoist, sync: { timeline: false, payments: true, paperwork: false, shopping: false, campaigns: false, house_reports: false } };
+    const off = { ...v.settings.todoist, sync: { hub: false, timeline: false, payments: true, paperwork: false, shopping: false, campaigns: false, house_reports: false } };
     expect(wantedTasks(v, off, today, String).every((w) => w.section === "Payments")).toBe(true);
   });
 });

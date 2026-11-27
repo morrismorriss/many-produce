@@ -195,7 +195,7 @@ export interface TodoistSettings {
   enabled: boolean;
   parent_project_id: string; // Todoist project the per-project projects live under ("" = top level)
   parent_name: string;
-  sync: { timeline: boolean; payments: boolean; paperwork: boolean; shopping: boolean; campaigns: boolean; house_reports: boolean };
+  sync: { hub: boolean; timeline: boolean; payments: boolean; paperwork: boolean; shopping: boolean; campaigns: boolean; house_reports: boolean };
   last_sync: string; // ISO time
   last_error: string;
 }
@@ -227,7 +227,7 @@ export const DEFAULT_SETTINGS: Settings = {
   max_hours_week: 0,
   todoist: {
     enabled: false, parent_project_id: "", parent_name: "", last_sync: "", last_error: "",
-    sync: { timeline: true, payments: true, paperwork: true, shopping: true, campaigns: true, house_reports: true },
+    sync: { hub: true, timeline: true, payments: true, paperwork: true, shopping: true, campaigns: true, house_reports: true },
   },
 };
 

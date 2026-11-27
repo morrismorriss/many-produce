@@ -5,6 +5,7 @@ import { allocTouches, allocValid, fmtDate, round2, shareOf, single, uid } from 
 import { useApp } from "../store";
 import { AllocTags, Empty, Field, Modal, Plus, Tile, saveTextFile } from "../components/bits";
 import { Header } from "../components/Shell";
+import { CsvImportModal } from "../components/CsvImport";
 import { SplitEditor } from "./Bookkeeping";
 
 const GROUPS: PaymentGroup[] = ["Overdue", "Next 30 days", "Later", "Paid"];
@@ -12,6 +13,7 @@ const GROUPS: PaymentGroup[] = ["Overdue", "Next 30 days", "Later", "Paid"];
 export function Payments() {
   const { allPayments, project, today, money, setPaid, openDrawer, newItemSignal, data } = useApp();
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   useEffect(() => {
     if (newItemSignal) setAdding(true);
   }, [newItemSignal]);
@@ -33,6 +35,7 @@ export function Payments() {
         actions={
           <>
             <button className="btn" onClick={() => saveTextFile("payments.ics", paymentsToICS(list, data.settings.currency), "text/calendar")}>Export to calendar (.ics)</button>
+            <button className="btn" onClick={() => setImporting(true)}>Import CSV</button>
             <button className="btn primary" onClick={() => setAdding(true)}><Plus /> Payment</button>
           </>
         }
@@ -88,6 +91,7 @@ export function Payments() {
           </Empty>
         )}
       </div>
+      {importing && <CsvImportModal kind="payments" title="Import payments" onClose={() => setImporting(false)} />}
       {adding && <PaymentModal onClose={() => setAdding(false)} />}
     </>
   );

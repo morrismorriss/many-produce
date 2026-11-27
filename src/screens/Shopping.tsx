@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { CsvImportModal } from "../components/CsvImport";
 import { Chips, EditCell, Empty, Field, Modal, Plus, ProjectTag, Tile, printHtml, saveTextFile } from "../components/bits";
 import { Header } from "../components/Shell";
 import { buyerListText, buyerRole, cost, defaultMoney, summarize } from "../lib/shopping";
@@ -27,6 +28,7 @@ export function Shopping() {
   const [adding, setAdding] = useState(false);
   const [reimbursing, setReimbursing] = useState<ShoppingItem | null>(null);
   const [listFor, setListFor] = useState(false);
+  const [importing, setImporting] = useState(false);
   useEffect(() => { if (newItemSignal) setAdding(true); }, [newItemSignal]);
 
   const all = useMemo(() => Object.values(data.shopping).flat().filter((i) => !project || i.project === project), [data.shopping, project]);
@@ -52,6 +54,7 @@ export function Shopping() {
         actions={
           <>
             <button className="btn" onClick={() => setListFor(true)}>Share a buyer&apos;s list</button>
+            <button className="btn" onClick={() => setImporting(true)}>Import CSV</button>
             <button className="btn primary" onClick={() => setAdding(true)}><Plus /> Item</button>
           </>
         }
@@ -145,6 +148,7 @@ export function Shopping() {
           </Empty>
         )}
       </div>
+      {importing && <CsvImportModal kind="shopping" title="Import a shopping list" onClose={() => setImporting(false)} />}
       {adding && <ItemModal onClose={() => setAdding(false)} />}
       {reimbursing && <ReimburseModal item={reimbursing} onClose={() => setReimbursing(null)} />}
       {listFor && <BuyerListModal items={all} onClose={() => setListFor(false)} />}

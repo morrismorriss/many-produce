@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { budgetFromCSV, budgetToCSV, budgetToManyApplyCSV, expenseActuals, incomeActuals, summarize, type ExpenseRow, type IncomeRow } from "../lib/budget";
+import { budgetToCSV, budgetToManyApplyCSV, expenseActuals, incomeActuals, summarize, type ExpenseRow, type IncomeRow } from "../lib/budget";
 import { projectFeeRate } from "../lib/ledger";
 import type { BudgetLine, Confidence } from "../lib/types";
 import { fmtDate, round2, uid } from "../lib/util";
 import { useApp } from "../store";
-import { EditCell, Empty, Modal, Plus, Progress, ProjectTag, Tile, saveTextFile } from "../components/bits";
+import { EditCell, Empty, Plus, Progress, ProjectTag, Tile, saveTextFile } from "../components/bits";
 import { Header } from "../components/Shell";
+import { CsvImportModal } from "../components/CsvImport";
 
 export function Budget() {
   const { data, project, money, saveBudget, newItemSignal } = useApp();
@@ -72,9 +73,9 @@ export function Budget() {
             <div className="card-head">
               <h2>Expenses</h2>
               <div className="spacer" />
+              <button className="btn small" onClick={() => setImporting(true)}>Import CSV</button>
               {target && (
                 <>
-                  <button className="btn small" onClick={() => setImporting(true)}>Import CSV</button>
                   <button className="btn small" onClick={() => saveTextFile(`${target}-budget.csv`, budgetToManyApplyCSV(data.budgets[target] ?? []), "text/csv")}>Export (Many Apply format)</button>
                   <button className="btn small" onClick={() => saveTextFile(`${target}-budget-full.csv`, budgetToCSV(data.budgets[target] ?? []), "text/csv")}>Export full</button>
                 </>
@@ -134,15 +135,7 @@ export function Budget() {
           </section>
         </div>
       </div>
-      {importing && target && (
-        <ImportBudget
-          onClose={() => setImporting(false)}
-          onImport={(lines, replace) => {
-            void saveBudget(target, replace ? lines : [...(data.budgets[target] ?? []), ...lines]);
-            setImporting(false);
-          }}
-        />
-      )}
+      {importing && <CsvImportModal kind="budget" title="Import a budget" onClose={() => setImporting(false)} />}
     </>
   );
 }
@@ -237,34 +230,3 @@ function IncomeRowView({ slug, row, showProject, feeLabel }: { slug: string; row
   );
 }
 
-function ImportBudget({ onClose, onImport }: { onClose: () => void; onImport: (lines: BudgetLine[], replace: boolean) => void }) {
-  const [text, setText] = useState("");
-  const [replace, setReplace] = useState(false);
-  let lines: BudgetLine[] = [];
-  let err = "";
-  try {
-    lines = text.trim() ? budgetFromCSV(text).map((l) => ({ ...l, id: uid("b") })) : [];
-  } catch (e) {
-    err = String(e);
-  }
-  return (
-    <Modal title="Import budget CSV" onClose={onClose}>
-      <p className="muted">Paste a budget CSV, such as one exported from Many Apply&apos;s budget builder (columns: category, type, line_item, quantity, rate, amount, notes).</p>
-      <input
-        type="file"
-        accept=".csv,text/csv"
-        aria-label="Choose a CSV file"
-        onChange={async (e) => { const f = e.target.files?.[0]; if (f) setText(await f.text()); }}
-      />
-      <textarea className="input" style={{ minHeight: 160, fontFamily: "ui-monospace, monospace", fontSize: 12 }} value={text} onChange={(e) => setText(e.target.value)} aria-label="CSV text" />
-      {err && <p className="neg">{err}</p>}
-      <p className="small muted">{lines.length} lines found.</p>
-      <div className="toolbar">
-        <label className="small"><input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Replace the current budget</label>
-        <div className="spacer" />
-        <button className="btn" onClick={onClose}>Cancel</button>
-        <button className="btn primary" disabled={!lines.length} onClick={() => onImport(lines, replace)}>Import</button>
-      </div>
-    </Modal>
-  );
-}

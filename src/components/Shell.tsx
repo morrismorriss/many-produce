@@ -8,6 +8,7 @@ import { gearWarnings } from "../lib/inventory";
 import { BUILTIN_THEMES } from "../lib/themes";
 import { useApp, type Screen } from "../store";
 import { Field, Modal, Plus } from "./bits";
+import { CoffeeLink } from "./Support";
 
 export interface Section {
   id: Screen; // the screen the sidebar item opens
@@ -120,6 +121,7 @@ export function Sidebar() {
           </div>
         ))}
       </div>
+      <div className="sidebar-foot"><CoffeeLink /></div>
       {creating && <ProjectModal onClose={() => setCreating(false)} />}
     </nav>
   );

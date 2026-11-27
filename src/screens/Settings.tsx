@@ -9,6 +9,7 @@ import { strToU8, zipSync } from "fflate";
 import { collectVault, exportAllCSV } from "../lib/backup";
 import { saveBinaryFile } from "../components/bits";
 import { TodoistSettings } from "./TodoistSettings";
+import { SUPPORT_URL, openExternal } from "../components/Support";
 import { ThemePicker } from "./ThemePicker";
 
 export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
@@ -142,6 +143,7 @@ export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
           <div className="card-head"><h2>About</h2></div>
           <p>Many Produce is free and open source. It has no AI features, no accounts and no servers. Its code was written with Claude Code and OpenHands.</p>
           <p className="small muted">Not accounting software and not tax advice. It keeps tidy records you can hand to a fiscal sponsor, funder or accountant.</p>
+          <p>If it helps your productions, you can support it: <button className="linkbtn" onClick={() => void openExternal(SUPPORT_URL)}>buymeacoffee.com/morriss</button></p>
         </section>
       </div>
       {editProject && p && <ProjectModal existing={p} onClose={() => setEditProject(false)} />}

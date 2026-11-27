@@ -16,6 +16,7 @@ import { itemFromShopping } from "./lib/inventory";
 import type { BudgetLine, Issued1099, LedgerEntry, PaperDoc, Payment, Person, Project, Settings, Sponsor, Template, Venue, VaultData } from "./lib/types";
 import { fmtMoney, primaryProject, todayISO, uid } from "./lib/util";
 import * as vault from "./lib/vault";
+import type { AnyRecord, ImportKind, ImportPlan } from "./lib/csvImport";
 
 export type Screen =
   | "dashboard" | "collaborators" | "venues" | "bookkeeping" | "budget" | "payments" | "shopping"
@@ -105,6 +106,10 @@ interface State {
   saveStrips: (project: string, s: StripScene[]) => Promise<void>;
   saveBoard: (project: string, b: Board) => Promise<void>;
   saveClearances: (project: string, c: Clearance[]) => Promise<void>;
+  /** Write a CSV import in one go. Returns a function that undoes it. */
+  applyImport: (kind: ImportKind, plan: ImportPlan<AnyRecord>) => Promise<() => Promise<void>>;
+  /** Add ledger entries in one write (statement imports). Returns an undo. */
+  importEntries: (entries: LedgerEntry[]) => Promise<() => Promise<void>>;
   /** Payments Todoist says are done; the user confirms the amount before they're marked paid. */
   todoistToConfirm: string[];
   syncTodoist: (manual?: boolean) => Promise<void>;
@@ -476,6 +481,121 @@ export const useStore = create<State>()((set, get) => {
     saveClearances: async (project, c) => {
       patch((d) => ({ clearances: { ...d.clearances, [project]: c } }));
       await vault.saveClearances(get().fs, project, c).catch(fail);
+    },
+
+    importEntries: async (entries) => {
+      const d = get().data;
+      let next = d.ledger;
+      for (const e of entries) next = upsertWithFees(next, e, d.projects, d.sponsors);
+      const years = yearsOf(...entries);
+      await writeLedger(next, years);
+      return async () => {
+        let kept = get().data.ledger;
+        for (const e of entries) kept = removeWithFees(kept, e.id).next;
+        await writeLedger(kept, years);
+      };
+    },
+
+    applyImport: async (kind, plan) => {
+      const d = get().data;
+      const undo: (() => Promise<void>)[] = [];
+
+      // People: imported contacts, or names found in the schedule or shopping list.
+      const people = kind === "people" ? (plan.add as Person[]) : plan.newPeople;
+      const peopleUpdates = kind === "people" ? (plan.update as { before: Person; after: Person }[]) : [];
+      if (people.length || peopleUpdates.length) {
+        const changed = [...people, ...peopleUpdates.map((u) => u.after)];
+        patch((x) => ({ people: changed.reduce((l, p) => upsert(l, p, (y) => y.slug), x.people) }));
+        for (const p of changed) await vault.savePerson(get().fs, p).catch(fail);
+        undo.push(async () => {
+          for (const p of people) await get().fs.trash(`people/${p.slug}.md`).catch(fail);
+          const gone = new Set(people.map((p) => p.slug));
+          patch((x) => ({ people: peopleUpdates.reduce((l, u) => upsert(l, u.before, (y) => y.slug), x.people.filter((p) => !gone.has(p.slug))) }));
+          for (const u of peopleUpdates) await vault.savePerson(get().fs, u.before).catch(fail);
+        });
+      }
+
+      if (kind === "venues") {
+        const add = plan.add as Venue[], ups = plan.update as { before: Venue; after: Venue }[];
+        const changed = [...add, ...ups.map((u) => u.after)];
+        patch((x) => ({ venues: changed.reduce((l, v) => upsert(l, v, (y) => y.slug), x.venues) }));
+        for (const v of changed) await vault.saveVenue(get().fs, v).catch(fail);
+        undo.push(async () => {
+          for (const v of add) await get().fs.trash(`venues/${v.slug}.md`).catch(fail);
+          const gone = new Set(add.map((v) => v.slug));
+          patch((x) => ({ venues: ups.reduce((l, u) => upsert(l, u.before, (y) => y.slug), x.venues.filter((v) => !gone.has(v.slug))) }));
+          for (const u of ups) await vault.saveVenue(get().fs, u.before).catch(fail);
+        });
+      }
+
+      if (kind === "budget" && plan.budgets) {
+        for (const [slug, lines] of Object.entries(plan.budgets)) {
+          const before = d.budgets[slug] ?? [];
+          await get().saveBudget(slug, lines);
+          undo.push(() => get().saveBudget(slug, before));
+        }
+      }
+
+      if (kind === "payments") {
+        const add = plan.add as Payment[];
+        const bySlug: Record<string, Payment[]> = {};
+        for (const p of add) (bySlug[primaryProject(p.project_alloc) || "overhead"] ??= []).push(p);
+        for (const [slug, list] of Object.entries(bySlug)) {
+          const before = get().data.payments[slug] ?? [];
+          await writePayments(slug, [...before, ...list]);
+          undo.push(() => writePayments(slug, before));
+        }
+        // Paid payments: new Bookkeeping entries, and links to entries already there.
+        const linked = new Map(add.filter((p) => p.ledger_id).map((p) => [p.ledger_id, p.id]));
+        const ledgerBefore = get().data.ledger;
+        let next = ledgerBefore.map((e) => (linked.has(e.id) && !plan.entries.some((x) => x.id === e.id) ? { ...e, linked_payment: linked.get(e.id)! } : e));
+        for (const e of plan.entries) next = upsertWithFees(next, e, d.projects, d.sponsors);
+        if (plan.entries.length || plan.linked) {
+          const years = yearsOf(...plan.entries, ...ledgerBefore.filter((e) => linked.has(e.id)));
+          await writeLedger(next, years);
+          undo.push(() => writeLedger(ledgerBefore, years));
+        }
+      }
+
+      if (kind === "events") {
+        const before = d.events;
+        const changed = [...(plan.add as ScheduleEvent[]), ...(plan.update as { after: ScheduleEvent }[]).map((u) => u.after)];
+        const touched = new Set(changed.map((e) => e.project));
+        patch((x) => ({ events: changed.reduce((l, e) => upsert(l, e, (y) => y.id), x.events) }));
+        for (const slug of touched) await vault.saveEvents(get().fs, slug, get().data.events).catch(fail);
+        undo.push(async () => {
+          patch(() => ({ events: before }));
+          for (const slug of touched) await vault.saveEvents(get().fs, slug, before).catch(fail);
+        });
+      }
+
+      if (kind === "shopping") {
+        const changed = [...(plan.add as ShoppingItem[]), ...(plan.update as { after: ShoppingItem }[]).map((u) => u.after)];
+        const touched = [...new Set(changed.map((i) => i.project))];
+        for (const slug of touched) {
+          const before = get().data.shopping[slug] ?? [];
+          const list = changed.filter((i) => i.project === slug).reduce((l, i) => upsert(l, i, (y) => y.id), before);
+          patch((x) => ({ shopping: { ...x.shopping, [slug]: list } }));
+          await vault.saveShopping(get().fs, slug, list).catch(fail);
+          undo.push(async () => {
+            patch((x) => ({ shopping: { ...x.shopping, [slug]: before } }));
+            await vault.saveShopping(get().fs, slug, before).catch(fail);
+          });
+        }
+      }
+
+      if (kind === "inventory") {
+        const before = d.inventory;
+        const changed = [...(plan.add as InventoryItem[]), ...(plan.update as { after: InventoryItem }[]).map((u) => u.after)];
+        patch((x) => ({ inventory: changed.reduce((l, i) => upsert(l, i, (y) => y.id), x.inventory) }));
+        await vault.saveInventory(get().fs, get().data.inventory).catch(fail);
+        undo.push(async () => {
+          patch(() => ({ inventory: before }));
+          await vault.saveInventory(get().fs, before).catch(fail);
+        });
+      }
+
+      return async () => { for (const u of undo.reverse()) await u(); };
     },
 
     todoistToConfirm: [],

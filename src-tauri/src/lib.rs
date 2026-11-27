@@ -112,6 +112,15 @@ fn vault_open_file(state: tauri::State<VaultState>, path: String) -> Result<(), 
     tauri_plugin_opener::open_path(p, None::<&str>).map_err(|e| e.to_string())
 }
 
+/// Open a web page in the default browser (the "Buy me a coffee" link). Only https.
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") {
+        return Err("Only https links can be opened.".into());
+    }
+    tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
 // ---- Shared themes ----
 // Themes live outside any vault, in a folder Many Write, Many Apply and
 // Many Produce all read, so a theme made in one shows up in the others:
@@ -376,6 +385,7 @@ pub fn run() {
             vault_read_base64,
             export_file_base64,
             vault_open_file,
+            open_url,
             themes_dir,
             themes_list,
             theme_save,

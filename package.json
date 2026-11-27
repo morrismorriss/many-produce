@@ -1,7 +1,7 @@
 {
   "name": "many-produce",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.3.0",
   "type": "module",
   "description": "Free, local-first desktop app for independent producers. No AI, no accounts, no cloud.",
   "license": "MIT",

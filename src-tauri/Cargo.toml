@@ -1,6 +1,6 @@
 [package]
 name = "many-produce"
-version = "0.2.1"
+version = "0.3.0"
 description = "Local-first producing hub. No AI, no accounts, no cloud."
 edition = "2021"
 license = "MIT"

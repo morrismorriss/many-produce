@@ -489,3 +489,6 @@ table.daily-calls input[type="time"] { width: 100px; }
 .hub-group h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 4px; }
 .hub-foot { display: flex; align-items: center; margin-top: 6px; }
 .hub-foot .spacer { flex: 1; }
+.todoist-where { border: 0; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 4px; }
+.todoist-where legend { padding: 0; margin-bottom: 4px; }
+.todoist-where > label { display: flex; gap: 6px; align-items: flex-start; }

@@ -1,8 +1,9 @@
 // Todoist sync. Many Produce keeps the full plan; Todoist holds the producer's
-// own to-dos. One Todoist project per Many Produce project (under a parent you
-// choose), with sections for To do (the Dashboard list), Payments, Paperwork,
-// Timeline, Shopping, Campaigns and Reports. General Dashboard to-dos go to
-// the Company overhead project.
+// own to-dos. Either everything goes into one Todoist project you pick, with a
+// section per show, or each show gets its own Todoist project (under a parent
+// you choose) with sections for To do (the Dashboard list), Payments,
+// Paperwork, Timeline, Shopping, Campaigns and Reports. General Dashboard
+// to-dos count as Company overhead.
 //
 // Sync is a diff between what the app wants in Todoist and what it last put
 // there (kept in .manyproduce/todoist.json), so anything changed while offline
@@ -28,7 +29,8 @@ export interface WantedTask {
 export interface SyncState {
   projects: Record<string, string>; // slug -> Todoist project id
   sections: Record<string, string>; // "slug|Section" -> section id
-  tasks: Record<string, { id: string; hash: string; project: string }>; // key -> task
+  tasks: Record<string, { id: string; hash: string; project: string; section?: string }>; // key -> task
+  target?: string; // where tasks went last time (see targetOf)
 }
 
 export const EMPTY_STATE: SyncState = { projects: {}, sections: {}, tasks: {} };
@@ -112,12 +114,13 @@ export interface SyncResult {
   created: number;
   updated: number;
   closed: number;
+  moved: number;
   completedInTodoist: string[]; // keys of tasks finished in Todoist since last sync
 }
 
 interface Page<T> { results: T[]; next_cursor?: string | null }
 
-async function listAll<T>(api: TodoistApi, path: string): Promise<T[]> {
+export async function listAll<T>(api: TodoistApi, path: string): Promise<T[]> {
   const out: T[] = [];
   let cursor = "";
   for (let i = 0; i < 50; i++) {
@@ -131,78 +134,100 @@ async function listAll<T>(api: TodoistApi, path: string): Promise<T[]> {
   return out;
 }
 
+/** Where tasks go, as stored in the sync state; changing it moves existing tasks. */
+export const targetOf = (s: TodoistSettings) => (s.mode === "one" ? `one:${s.target_project_id}` : `per-project:${s.parent_project_id}`);
+
 /**
  * One sync pass:
- * 1. Make sure every project and section exists.
- * 2. Find tasks completed in Todoist (no longer active) — completion there wins.
- * 3. Create, update or close tasks so Todoist matches what the app wants.
+ * 1. Find tasks completed in Todoist (no longer active where we put them) — completion there wins.
+ * 2. Make sure every project and section exists: either one section per show
+ *    inside the Todoist project you picked, or a project per show with a
+ *    section per kind (Payments, Timeline…).
+ * 3. Create, update, move or close tasks so Todoist matches what the app wants.
  */
 export async function runSync(api: TodoistApi, wanted: WantedTask[], projectNames: Record<string, string>, settings: TodoistSettings, prev: SyncState): Promise<SyncResult> {
-  const state: SyncState = { projects: { ...prev.projects }, sections: { ...prev.sections }, tasks: { ...prev.tasks } };
-
-  // 1. Projects and sections.
-  const slugs = [...new Set(wanted.map((w) => w.project))];
+  const state: SyncState = { projects: { ...prev.projects }, sections: { ...prev.sections }, tasks: { ...prev.tasks }, target: prev.target };
+  const one = settings.mode === "one";
+  const target = targetOf(settings);
   const existing = await listAll<{ id: string; name: string; parent_id?: string | null }>(api, "/api/v1/projects");
-  for (const slug of slugs) {
-    if (state.projects[slug] && existing.some((p) => p.id === state.projects[slug])) continue;
-    const name = projectNames[slug] ?? slug;
-    const found = existing.find((p) => p.name === name && (p.parent_id ?? "") === (settings.parent_project_id || ""));
-    const proj = found ?? ((await api.request("POST", "/api/v1/projects", { name, ...(settings.parent_project_id ? { parent_id: settings.parent_project_id } : {}) })) as { id: string });
-    state.projects[slug] = proj.id;
-    for (const k of Object.keys(state.sections)) if (k.startsWith(`${slug}|`)) delete state.sections[k];
-    // The project we'd made is gone (deleted in Todoist, or never existed): its
-    // tasks went with it. Forget them so they're re-created below, rather than
-    // treated as "finished in Todoist" (which would mark every item done here).
-    for (const [k, t] of Object.entries(state.tasks)) if (t.project === slug) delete state.tasks[k];
-  }
-  for (const slug of slugs) {
-    const pid = state.projects[slug];
-    const needed = new Set(wanted.filter((w) => w.project === slug).map((w) => w.section));
-    const missing = [...needed].filter((sec) => !state.sections[`${slug}|${sec}`]);
-    if (!missing.length) continue;
-    const have = await listAll<{ id: string; name: string }>(api, `/api/v1/sections?project_id=${pid}`);
-    for (const sec of SECTIONS) {
-      if (!needed.has(sec) || state.sections[`${slug}|${sec}`]) continue;
-      const s = have.find((x) => x.name === sec) ?? ((await api.request("POST", "/api/v1/sections", { name: sec, project_id: pid })) as { id: string });
-      state.sections[`${slug}|${sec}`] = s.id;
+  const liveIds = new Set(existing.map((p) => p.id));
+
+  // 1. Completed in Todoist: a task we made that's no longer active in the project we put it in.
+  const completedInTodoist: string[] = [];
+  const active = new Map<string, Set<string>>(); // Todoist project id -> active task ids
+  for (const [key, t] of Object.entries(state.tasks)) {
+    const pid = state.projects[t.project];
+    // Its project is gone from Todoist (deleted, tasks and all): forget it quietly
+    // instead of reporting it finished, so it's re-created if still wanted.
+    if (!pid || !liveIds.has(pid)) { delete state.tasks[key]; continue; }
+    if (!active.has(pid)) active.set(pid, new Set((await listAll<{ id: string }>(api, `/api/v1/tasks?project_id=${pid}`)).map((x) => x.id)));
+    if (!active.get(pid)!.has(t.id)) {
+      completedInTodoist.push(key);
+      delete state.tasks[key];
     }
   }
 
-  // 2. Completed in Todoist: a task we made that's no longer in its project's active list.
-  const completedInTodoist: string[] = [];
-  const trackedProjects = [...new Set(Object.values(state.tasks).map((t) => t.project))];
-  const liveIds = new Set(existing.map((p) => p.id));
-  for (const slug of trackedProjects) {
-    const pid = state.projects[slug];
-    // A project that's no longer in Todoist (and no longer wanted) took its tasks
-    // with it: drop them quietly instead of reporting them finished.
-    if (!pid || !liveIds.has(pid)) {
-      for (const [k, t] of Object.entries(state.tasks)) if (t.project === slug && !wanted.some((w) => w.project === slug)) delete state.tasks[k];
-      continue;
+  // 2. Projects and sections.
+  // State from before you could pick one project has no target: it was a project per show.
+  const before = state.target ?? (Object.keys(prev.tasks).length ? (one ? "per-project:" : target) : target);
+  const moving = before !== target;
+  if (moving) { state.projects = {}; state.sections = {}; }
+  state.target = target;
+  const slugs = [...new Set(wanted.map((w) => w.project))];
+  if (one) {
+    if (!settings.target_project_id) throw new Error("Choose the Todoist project to add tasks to in Settings → Todoist.");
+    if (!liveIds.has(settings.target_project_id)) throw new Error(`The Todoist project "${settings.target_name || settings.target_project_id}" isn't there anymore. Pick another in Settings → Todoist.`);
+    for (const slug of slugs) state.projects[slug] = settings.target_project_id;
+  } else {
+    for (const slug of slugs) {
+      if (state.projects[slug] && liveIds.has(state.projects[slug])) continue;
+      const name = projectNames[slug] ?? slug;
+      const found = existing.find((p) => p.name === name && (p.parent_id ?? "") === (settings.parent_project_id || ""));
+      const proj = found ?? ((await api.request("POST", "/api/v1/projects", { name, ...(settings.parent_project_id ? { parent_id: settings.parent_project_id } : {}) })) as { id: string });
+      state.projects[slug] = proj.id;
+      for (const k of Object.keys(state.sections)) if (k.startsWith(`${slug}|`)) delete state.sections[k];
     }
-    const active = new Set((await listAll<{ id: string }>(api, `/api/v1/tasks?project_id=${pid}`)).map((t) => t.id));
-    for (const [key, t] of Object.entries(state.tasks)) {
-      if (t.project === slug && !active.has(t.id)) {
-        completedInTodoist.push(key);
-        delete state.tasks[key];
-      }
-    }
+  }
+  // One project: a section per show. A project per show: a section per kind.
+  const secKey = (w: WantedTask) => (one ? `${w.project}|*` : `${w.project}|${w.section}`);
+  const secName = (w: WantedTask) => (one ? projectNames[w.project] ?? w.project : w.section);
+  const sectionLists = new Map<string, { id: string; name: string }[]>();
+  const needed = [...new Map(wanted.map((w) => [secKey(w), w])).values()]
+    .sort((a, b) => SECTIONS.indexOf(a.section) - SECTIONS.indexOf(b.section));
+  for (const w of needed) {
+    const key = secKey(w);
+    if (state.sections[key]) continue;
+    const pid = state.projects[w.project];
+    if (!sectionLists.has(pid)) sectionLists.set(pid, await listAll<{ id: string; name: string }>(api, `/api/v1/sections?project_id=${pid}`));
+    const list = sectionLists.get(pid)!;
+    const s = list.find((x) => x.name === secName(w)) ?? ((await api.request("POST", "/api/v1/sections", { name: secName(w), project_id: pid })) as { id: string; name: string });
+    if (!list.includes(s)) list.push({ id: s.id, name: secName(w) });
+    state.sections[key] = s.id;
   }
 
   // 3. Push.
-  let created = 0, updated = 0, closed = 0;
+  let created = 0, updated = 0, closed = 0, moved = 0;
   const wantedKeys = new Set(wanted.map((w) => w.key));
   for (const w of wanted) {
     if (completedInTodoist.includes(w.key)) continue; // done there; the app catches up instead
     const have = state.tasks[w.key];
+    const sid = state.sections[secKey(w)];
     const body = { content: w.content, description: w.description, ...(w.due ? { due_date: w.due } : { due_string: "no date" }) };
     if (!have) {
-      const t = (await api.request("POST", "/api/v1/tasks", { ...body, project_id: state.projects[w.project], section_id: state.sections[`${w.project}|${w.section}`] })) as { id: string };
-      state.tasks[w.key] = { id: t.id, hash: hashOf(w), project: w.project };
+      const t = (await api.request("POST", "/api/v1/tasks", { ...body, project_id: state.projects[w.project], section_id: sid })) as { id: string };
+      state.tasks[w.key] = { id: t.id, hash: hashOf(w), project: w.project, section: sid };
       created++;
-    } else if (have.hash !== hashOf(w)) {
+      continue;
+    }
+    // Moved when where-tasks-go changed in Settings (or the item moved to another section).
+    if (have.section !== sid && (moving || have.section)) {
+      await api.request("POST", `/api/v1/tasks/${have.id}/move`, { section_id: sid });
+      moved++;
+    }
+    state.tasks[w.key] = { ...have, project: w.project, section: sid };
+    if (have.hash !== hashOf(w)) {
       await api.request("POST", `/api/v1/tasks/${have.id}`, body);
-      state.tasks[w.key] = { ...have, hash: hashOf(w) };
+      state.tasks[w.key].hash = hashOf(w);
       updated++;
     }
   }
@@ -213,7 +238,7 @@ export async function runSync(api: TodoistApi, wanted: WantedTask[], projectName
     delete state.tasks[key];
     closed++;
   }
-  return { state, created, updated, closed, completedInTodoist };
+  return { state, created, updated, closed, moved, completedInTodoist };
 }
 
 /** Remove every task the app created (when turning sync off and choosing to clean up). */

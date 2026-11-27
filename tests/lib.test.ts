@@ -651,6 +651,8 @@ function fakeTodoist() {
       if (method === "POST" && p === "/api/v1/sections") { const x = { id: `s${++n}`, name: body!.name, project_id: body!.project_id }; sections.push(x); return x; }
       if (method === "GET" && p === "/api/v1/tasks") return { results: tasks.filter((t) => t.project_id === qp.get("project_id") && !t.checked) };
       if (method === "POST" && p === "/api/v1/tasks") { const x = { id: `t${++n}`, content: body!.content, project_id: body!.project_id, section_id: body!.section_id, due_date: body!.due_date, checked: false }; tasks.push(x); return x; }
+      const mv = /^\/api\/v1\/tasks\/(\w+)\/move$/.exec(p);
+      if (mv && method === "POST") { const t = tasks.find((x) => x.id === mv[1])!; t.section_id = body!.section_id; t.project_id = sections.find((x) => x.id === body!.section_id)!.project_id; return null; }
       const m = /^\/api\/v1\/tasks\/(\w+)(\/close)?$/.exec(p);
       if (m && method === "POST") { const t = tasks.find((x) => x.id === m[1])!; if (m[2]) t.checked = true; else Object.assign(t, { content: body!.content, due_date: body!.due_date }); return null; }
       if (m && method === "DELETE") { tasks.splice(tasks.findIndex((x) => x.id === m[1]), 1); return null; }
@@ -664,7 +666,7 @@ describe("todoist sync", () => {
   const today = "2026-11-26";
   it("creates projects, sections and tasks, then updates, closes and picks up completions", async () => {
     const v = await loadVault(new MemoryFS(sampleVault(today)));
-    const settings = { ...v.settings.todoist, enabled: true, parent_project_id: "" };
+    const settings = { ...v.settings.todoist, enabled: true, mode: "per-project" as const, parent_project_id: "" };
     const money = (n: number) => "$" + n;
     const wanted = wantedTasks(v, settings, today, money);
     const keys = wanted.map((w) => w.key);
@@ -703,7 +705,7 @@ describe("todoist sync", () => {
 
   it("re-creates tasks, without marking anything done, when its Todoist project was deleted", async () => {
     const v = await loadVault(new MemoryFS(sampleVault(today)));
-    const settings = { ...v.settings.todoist, enabled: true, parent_project_id: "" };
+    const settings = { ...v.settings.todoist, enabled: true, mode: "per-project" as const, parent_project_id: "" };
     const wanted = wantedTasks(v, settings, today, String);
     const names = Object.fromEntries(v.projects.map((p) => [p.slug, p.name]));
     const t = fakeTodoist();
@@ -720,7 +722,7 @@ describe("todoist sync", () => {
   it("syncs Dashboard to-dos into a To do section, general ones under Company overhead", async () => {
     const v = await loadVault(new MemoryFS(sampleVault(today)));
     v.todos.push({ id: "tdx", text: "Old show wrap-up", done: false, project: "no-such-project", due: "", created: "", done_date: "" });
-    const settings = { ...v.settings.todoist, enabled: true, parent_project_id: "" };
+    const settings = { ...v.settings.todoist, enabled: true, mode: "per-project" as const, parent_project_id: "" };
     const hub = wantedTasks(v, settings, today, String).filter((w) => w.key.startsWith("hub:"));
     expect(hub.every((w) => w.section === "To do")).toBe(true);
     expect(hub.find((w) => w.key === "hub:td1")).toMatchObject({ project: "prodigy", content: "Send rehearsal report to the director" });
@@ -736,6 +738,56 @@ describe("todoist sync", () => {
     const r2 = await runSync(t.api, hub, names, settings, r1.state);
     expect(r2.completedInTodoist).toEqual(["hub:td1"]);
     expect(wantedTasks(v, { ...settings, sync: { ...settings.sync, hub: false } }, today, String).some((w) => w.key.startsWith("hub:"))).toBe(false);
+  });
+
+  it("puts everything in one picked project, a section per show, and moves tasks when that changes", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const t = fakeTodoist();
+    t.projects.push({ id: "mine", name: "Work", parent_id: null }, { id: "other", name: "Shows", parent_id: null });
+    const one = { ...v.settings.todoist, enabled: true, mode: "one" as const, target_project_id: "mine", target_name: "Work" };
+    const wanted = wantedTasks(v, one, today, String);
+    const names = Object.fromEntries(v.projects.map((p) => [p.slug, p.name]));
+    const r1 = await runSync(t.api, wanted, names, one, EMPTY_STATE);
+    expect(t.projects).toHaveLength(2); // nothing created
+    expect(t.tasks.every((x) => x.project_id === "mine")).toBe(true);
+    const shows = [...new Set(wanted.map((w) => names[w.project]))].sort();
+    expect(t.sections.map((x) => x.name).sort()).toEqual(shows);
+    const r2 = await runSync(t.api, wanted, names, one, r1.state);
+    expect([r2.created, r2.updated, r2.closed, r2.moved]).toEqual([0, 0, 0, 0]);
+
+    // Pick a different project: the same tasks move, nothing is duplicated or marked done.
+    const other = { ...one, target_project_id: "other", target_name: "Shows" };
+    const r3 = await runSync(t.api, wanted, names, other, r2.state);
+    expect([r3.created, r3.moved, r3.completedInTodoist.length]).toEqual([0, wanted.length, 0]);
+    expect(t.tasks.filter((x) => !x.checked).every((x) => x.project_id === "other")).toBe(true);
+
+    // Back to a project per show: moved again, into new show projects.
+    const per = { ...one, mode: "per-project" as const, parent_project_id: "" };
+    const r4 = await runSync(t.api, wanted, names, per, r3.state);
+    expect([r4.created, r4.moved]).toEqual([0, wanted.length]);
+    expect(t.tasks.some((x) => x.project_id === "other")).toBe(false);
+  });
+
+  it("moves tasks synced before one-project mode existed, and complains when no project is picked", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const t = fakeTodoist();
+    const per = { ...v.settings.todoist, enabled: true, mode: "per-project" as const, parent_project_id: "" };
+    const wanted = wantedTasks(v, per, today, String);
+    const names = Object.fromEntries(v.projects.map((p) => [p.slug, p.name]));
+    const r1 = await runSync(t.api, wanted, names, per, EMPTY_STATE);
+    const legacy = { ...r1.state, target: undefined, tasks: Object.fromEntries(Object.entries(r1.state.tasks).map(([k, x]) => [k, { id: x.id, hash: x.hash, project: x.project }])) };
+    // Same mode as before: nothing moves.
+    expect((await runSync(t.api, wanted, names, per, legacy)).moved).toBe(0);
+    t.projects.push({ id: "mine", name: "Work", parent_id: null });
+    const r2 = await runSync(t.api, wanted, names, { ...per, mode: "one", target_project_id: "mine", target_name: "Work" }, legacy);
+    expect([r2.created, r2.moved]).toEqual([0, wanted.length]);
+    await expect(runSync(t.api, wanted, names, { ...per, mode: "one", target_project_id: "" }, r2.state)).rejects.toThrow(/Choose the Todoist project/);
+  });
+
+  it("keeps a project per show for vaults that already synced", async () => {
+    const synced = await loadVault(new MemoryFS({ ".manyproduce/settings.json": JSON.stringify({ todoist: { enabled: true, last_sync: "2026-11-01T00:00:00Z" } }) }));
+    expect(synced.settings.todoist.mode).toBe("per-project");
+    expect((await loadVault(new MemoryFS())).settings.todoist.mode).toBe("one");
   });
 
   it("respects the sync toggles", async () => {

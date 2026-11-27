@@ -181,7 +181,7 @@ export const useStore = create<State>()((set, get) => {
       }
       set((st) => ({ todoistToConfirm: [...new Set([...st.todoistToConfirm, ...confirm])] }));
       await get().saveSettings({ ...get().data.settings, todoist: { ...get().data.settings.todoist, last_sync: new Date().toISOString(), last_error: "" } });
-      if (manual) get().toast(`Todoist: ${res.created} added, ${res.updated} updated, ${res.closed} closed${res.completedInTodoist.length ? `, ${res.completedInTodoist.length} finished in Todoist` : ""}`);
+      if (manual) get().toast(`Todoist: ${res.created} added, ${res.updated} updated, ${res.closed} closed${res.moved ? `, ${res.moved} moved` : ""}${res.completedInTodoist.length ? `, ${res.completedInTodoist.length} finished in Todoist` : ""}`);
     } catch (e) {
       const msg = String(e);
       await get().saveSettings({ ...get().data.settings, todoist: { ...get().data.settings.todoist, last_error: msg.includes("offline") ? "Offline. Changes will sync next time." : msg } });

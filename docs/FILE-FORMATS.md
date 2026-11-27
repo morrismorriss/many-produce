@@ -344,7 +344,7 @@ id,item,type,scenes,owner,contact,scope,territory,term,fee,status,requested,clea
 
 ## .manyproduce/todoist.json
 
-`projects` (project slug → Todoist project id), `sections` ("slug|Section" → section id) and `tasks` (item key such as `payment:p3`, `timeline:prodigy:t12` or `hub:td1` → `{ id, hash, project }`). The mapping lives here rather than in each item's file, so nothing else changes when sync is turned on or off. The token itself is in the OS keychain (service "Many Produce"), never in the vault.
+`target` (where tasks go: `one:<Todoist project id>` or `per-project:<parent id>`; when it changes, tasks are moved), `projects` (project slug → Todoist project id), `sections` ("slug|Section" → section id, or "slug|*" for a show's section in the one picked project) and `tasks` (item key such as `payment:p3`, `timeline:prodigy:t12` or `hub:td1` → `{ id, hash, project, section }`). The mapping lives here rather than in each item's file, so nothing else changes when sync is turned on or off. The token itself is in the OS keychain (service "Many Produce"), never in the vault.
 
 ## Themes (outside the vault)
 

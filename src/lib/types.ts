@@ -193,6 +193,10 @@ export interface Settings {
 
 export interface TodoistSettings {
   enabled: boolean;
+  /** "one": every task goes into target_project_id, a section per show. "per-project": a Todoist project per show. */
+  mode: "one" | "per-project";
+  target_project_id: string;
+  target_name: string;
   parent_project_id: string; // Todoist project the per-project projects live under ("" = top level)
   parent_name: string;
   sync: { hub: boolean; timeline: boolean; payments: boolean; paperwork: boolean; shopping: boolean; campaigns: boolean; house_reports: boolean };
@@ -226,7 +230,7 @@ export const DEFAULT_SETTINGS: Settings = {
   doc_types: [],
   max_hours_week: 0,
   todoist: {
-    enabled: false, parent_project_id: "", parent_name: "", last_sync: "", last_error: "",
+    enabled: false, mode: "one", target_project_id: "", target_name: "", parent_project_id: "", parent_name: "", last_sync: "", last_error: "",
     sync: { hub: true, timeline: true, payments: true, paperwork: true, shopping: true, campaigns: true, house_reports: true },
   },
 };

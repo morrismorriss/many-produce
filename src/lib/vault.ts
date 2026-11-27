@@ -272,6 +272,8 @@ async function loadVaultInner(fs: VaultFS): Promise<VaultData> {
   try {
     const raw = JSON.parse((await fs.read(SETTINGS_PATH)) ?? "{}");
     settings = { ...DEFAULT_SETTINGS, ...raw, todoist: { ...DEFAULT_SETTINGS.todoist, ...(raw.todoist ?? {}), sync: { ...DEFAULT_SETTINGS.todoist.sync, ...(raw.todoist?.sync ?? {}) } } };
+    // Vaults that synced before you could pick one project keep a project per show.
+    if (raw.todoist && !raw.todoist.mode && (raw.todoist.enabled || raw.todoist.last_sync)) settings.todoist.mode = "per-project";
   } catch {
     /* keep defaults if the file is broken */
   }

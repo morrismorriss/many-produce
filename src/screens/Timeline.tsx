@@ -87,7 +87,7 @@ export function TimelineTab() {
       )}
 
       {view === "Checklist" && allWeeks.length > 0 && (
-        <table className="t">
+        <div className="table-scroll"><table className="t">
           {allWeeks.map((w) => (
             <tbody key={w || "nodate"}>
               <tr className="group-head"><td colSpan={6}>{w ? `Week of ${fmtDate(w, true)}${w === weekStart(today) ? " · this week" : ""}` : "No date yet"}</td></tr>
@@ -129,7 +129,7 @@ export function TimelineTab() {
               })}
             </tbody>
           ))}
-        </table>
+        </table></div>
       )}
 
       {view === "Timeline" && <Gantt rows={rows} milestones={milestones} today={today} owner={owner} onOpen={setEditing} />}

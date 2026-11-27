@@ -701,6 +701,22 @@ describe("todoist sync", () => {
     expect(t.tasks.find((x) => x.id === r1.state.tasks["payment:p2"].id)!.due_date).toBe("2026-12-01");
   });
 
+  it("re-creates tasks, without marking anything done, when its Todoist project was deleted", async () => {
+    const v = await loadVault(new MemoryFS(sampleVault(today)));
+    const settings = { ...v.settings.todoist, enabled: true, parent_project_id: "" };
+    const wanted = wantedTasks(v, settings, today, String);
+    const names = Object.fromEntries(v.projects.map((p) => [p.slug, p.name]));
+    const t = fakeTodoist();
+    const r1 = await runSync(t.api, wanted, names, settings, EMPTY_STATE);
+    // The user deletes the "Prodigy" project in Todoist, tasks and all.
+    const pid = r1.state.projects.prodigy;
+    t.projects.splice(t.projects.findIndex((p) => p.id === pid), 1);
+    for (let i = t.tasks.length - 1; i >= 0; i--) if (t.tasks[i].project_id === pid) t.tasks.splice(i, 1);
+    const r2 = await runSync(t.api, wanted, names, settings, r1.state);
+    expect(r2.completedInTodoist).toEqual([]);
+    expect(r2.created).toBe(wanted.filter((w) => w.project === "prodigy").length);
+  });
+
   it("respects the sync toggles", async () => {
     const v = await loadVault(new MemoryFS(sampleVault(today)));
     const off = { ...v.settings.todoist, sync: { timeline: false, payments: true, paperwork: false, shopping: false, campaigns: false, house_reports: false } };
@@ -787,5 +803,30 @@ describe("themes", () => {
     expect(JSON.parse(themeToJSON(mw)).colors).toMatchObject({ background: "#f4f9fb", sidebar: "#e6f1f5", accent: "#1f6f8b" });
     expect(() => themeFromJSON('{"hello":1}')).toThrow("isn't a theme");
     expect(themeVars(t)["--font-head"]).toContain("EB Garamond");
+  });
+});
+
+describe("safety helpers", () => {
+  it("only opens web and email links", async () => {
+    const { safeExternalUrl } = await import("../src/components/Support");
+    expect(safeExternalUrl("https://www.ebay.com")).toBe("https://www.ebay.com/");
+    expect(safeExternalUrl("www.ebay.com/item")).toBe("https://www.ebay.com/item");
+    expect(safeExternalUrl("mailto:ana@example.com")).toBe("mailto:ana@example.com");
+    expect(safeExternalUrl("javascript:alert(1)")).toBeNull();
+    expect(safeExternalUrl("file:///etc/passwd")).toBeNull();
+    expect(safeExternalUrl("")).toBeNull();
+  });
+
+  it("formats money even with a bad currency code in settings", async () => {
+    const { fmtMoney } = await import("../src/lib/util");
+    expect(fmtMoney(12, "dollars")).toBe("$12");
+    expect(fmtMoney(12, "eur")).toBe("€12");
+    expect(fmtMoney(Number.NaN)).toBe("$0");
+  });
+
+  it("names the broken file when the vault can't be read", async () => {
+    const fs = new MemoryFS(sampleVault("2026-11-26"));
+    fs.files.set("people/broken.md", "---\nname: [unclosed\n---\n");
+    await expect(loadVault(fs)).rejects.toThrow(/people\/broken\.md/);
   });
 });

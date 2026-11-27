@@ -12,8 +12,11 @@ const FM = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 export function parseFrontmatter<T = Record<string, unknown>>(text: string): Doc<T> {
   const m = FM.exec(text);
   if (!m) return { data: {} as T, body: text };
-  const data = (YAML.parse(m[1]) ?? {}) as T;
-  return { data, body: text.slice(m[0].length) };
+  // Broken YAML throws (loadVault names the file) rather than reading as empty,
+  // which could let a later save overwrite what's in it.
+  let data: unknown = YAML.parse(m[1]);
+  if (!data || typeof data !== "object" || Array.isArray(data)) data = {};
+  return { data: data as T, body: text.slice(m[0].length) };
 }
 
 export function stringifyFrontmatter(data: object, body = ""): string {

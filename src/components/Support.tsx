@@ -37,13 +37,33 @@ export function shouldAsk(s: SupportState, today: string): boolean {
   return !s.next || today >= s.next;
 }
 
+/**
+ * A link that's safe to hand to the browser or mail app: http(s) or mailto only
+ * ("www.example.com" gets https:// added). Anything else (javascript:, file:…) is null.
+ */
+export function safeExternalUrl(raw: string): string | null {
+  const s = (raw ?? "").trim();
+  if (!s) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(s) ? s : /^[^\s/]+\.[^\s/]+/.test(s) ? `https://${s}` : s;
+  try {
+    const u = new URL(withScheme);
+    return ["https:", "http:", "mailto:"].includes(u.protocol) ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Open a web page in the user's browser (desktop) or a new tab. */
 export async function openExternal(url: string) {
+  const safe = safeExternalUrl(url);
+  if (!safe) throw new Error("Only web and email links can be opened.");
   if (isTauri()) {
     const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("open_url", { url });
+    await invoke("open_url", { url: safe });
+  } else if (safe.startsWith("mailto:")) {
+    window.location.href = safe;
   } else {
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open(safe, "_blank", "noopener,noreferrer");
   }
 }
 

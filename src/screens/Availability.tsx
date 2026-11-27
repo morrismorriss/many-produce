@@ -109,7 +109,7 @@ export function AvailabilityTab({ onSchedule }: { onSchedule: (e: Partial<Schedu
         <section className="card" aria-label="Hours tally">
           <div className="card-head"><h2>Hours called</h2><span className="muted small">{fmtDate(from)}–{fmtDate(addDays(from, days - 1))}</span></div>
           {Object.keys(tally).length ? (
-            <table className="t">
+            <div className="table-scroll"><table className="t">
               <tbody>
                 {Object.entries(tally).sort((a, b) => b[1].hours - a[1].hours).map(([slug, t]) => {
                   const person = data.people.find((x) => x.slug === slug);
@@ -125,7 +125,7 @@ export function AvailabilityTab({ onSchedule }: { onSchedule: (e: Partial<Schedu
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
           ) : (
             <p className="muted small">No one is called in these dates yet.</p>
           )}
@@ -152,7 +152,7 @@ function ConflictList() {
   return (
     <details className="card" style={{ marginTop: 14 }} open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
       <summary><strong>All conflicts</strong> <span className="muted small">({list.length})</span></summary>
-      <table className="t" style={{ marginTop: 8 }}>
+      <div className="table-scroll"><table className="t" style={{ marginTop: 8 }}>
         <tbody>
           {list.map((c) => (
             <tr key={c.id}>
@@ -164,7 +164,7 @@ function ConflictList() {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </details>
   );
 }

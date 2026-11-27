@@ -93,7 +93,7 @@ export function Bookkeeping() {
         {importing && <ImportLedger onClose={() => setImporting(false)} />}
 
         {rows.length ? (
-          <table className="t">
+          <div className="table-scroll"><table className="t">
             <thead>
               <tr>
                 <th>Date</th>
@@ -129,7 +129,7 @@ export function Bookkeeping() {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         ) : (
           <Empty title={data.ledger.length ? "No entries match these filters" : "No entries yet"}>
             <p>Every dollar in and out goes here. Start with <strong>+ Income</strong> or <strong>+ Expense</strong>.</p>
@@ -337,15 +337,15 @@ export function SplitEditor({ alloc, onChange }: { alloc: Alloc; onChange: (a: A
 function ReceiptPicker({ value, date, description, onChange }: { value: string; date: string; description: string; onChange: (path: string) => void }) {
   const { fs, toast } = useApp();
   const pick = async () => {
-    if (fs.kind === "desktop" && fs.importFile) {
-      const { open } = await import("@tauri-apps/plugin-dialog");
-      const src = await open({ multiple: false, filters: [{ name: "Receipts", extensions: ["pdf", "png", "jpg", "jpeg", "heic", "webp"] }] });
-      if (typeof src !== "string") return;
-      const ext = src.split(".").pop() ?? "pdf";
+    if (fs.kind === "desktop" && fs.importPick) {
       const base = `${date}-${(description || "receipt").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40)}`;
-      const dest = `ledger/receipts/${base}.${ext}`;
-      await fs.importFile(src, dest);
-      onChange(dest);
+      try {
+        // Never overwrites: a second receipt with the same date and description gets -2.
+        const dest = await fs.importPick("ledger/receipts", base, "Choose the receipt", ["pdf", "png", "jpg", "jpeg", "heic", "webp"]);
+        if (dest) onChange(dest);
+      } catch (e) {
+        toast(`Couldn't attach the receipt: ${String(e)}`);
+      }
     } else {
       toast("Attaching receipts needs the desktop app. In the browser demo you can type a file name.");
     }
@@ -414,7 +414,7 @@ function ImportLedger({ onClose }: { onClose: () => void }) {
       {result && (
         <div className="card" style={{ background: "var(--surface)" }}>
           <p className="small"><strong>{result.entries.length}</strong> new entries{result.skipped ? ` · ${result.skipped} already in the ledger` : ""}{result.bad ? ` · ${result.bad} rows without a date or amount` : ""}</p>
-          <table className="t"><tbody>{result.entries.slice(0, 6).map((e) => <tr key={e.id}><td className="num small">{e.date}</td><td className="small">{e.description}</td><td className="small muted">{e.category}</td><td className={`r num small ${e.kind === "income" ? "in" : ""}`}>{e.kind === "income" ? "+" : "−"}{e.amount.toFixed(2)}</td></tr>)}</tbody></table>
+          <div className="table-scroll"><table className="t"><tbody>{result.entries.slice(0, 6).map((e) => <tr key={e.id}><td className="num small">{e.date}</td><td className="small">{e.description}</td><td className="small muted">{e.category}</td><td className={`r num small ${e.kind === "income" ? "in" : ""}`}>{e.kind === "income" ? "+" : "−"}{e.amount.toFixed(2)}</td></tr>)}</tbody></table></div>
           {result.entries.length > 6 && <p className="small muted">…and {result.entries.length - 6} more.</p>}
           <p className="small muted">Imported entries get the category from the file (or Other). Open any of them afterwards to tag, split or attach a receipt.</p>
         </div>

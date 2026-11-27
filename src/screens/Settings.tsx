@@ -72,7 +72,7 @@ export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
         <section className="card">
           <div className="card-head"><h2>Money sources</h2><div className="spacer" /><button className="btn small" onClick={() => save({ money_sources: [...s.money_sources, { name: "New source", opening_balance: 0, opening_date: "" }] })}>+ Source</button></div>
           <p className="small muted">Starting balance for each place money sits. Ledger entries dated on or after the &quot;as of&quot; date keep it current. Link a sponsor fund to its sponsor so income through that sponsor lands there in the forecast.</p>
-          <table className="t">
+          <div className="table-scroll"><table className="t">
             <thead><tr><th>Name</th><th className="r">Opening balance</th><th>As of</th><th>Sponsor fund for</th><th /></tr></thead>
             <tbody>
               {s.money_sources.map((m, i) => (
@@ -90,7 +90,7 @@ export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
           <div className="form-grid" style={{ marginTop: 10 }}>
             <Field label="Low-balance cushion">
               <input type="number" value={s.cushion} onChange={(e) => save({ cushion: Number(e.target.value) || 0 })} />
@@ -122,12 +122,12 @@ export function Settings({ onSwitchVault }: { onSwitchVault: () => void }) {
 
         <section className="card">
           <div className="card-head"><h2>Fiscal sponsors</h2><div className="spacer" /><button className="btn small" onClick={() => { const name = prompt("Sponsor name"); if (name) void saveSponsor({ slug: slugify(name), name, fee_rate: 0, fee_applies_to: "contributed income", contact: "", account_url: "", review_required_for: [], report_schedule: "", notes: "" }); }}>+ Sponsor</button></div>
-          <table className="t">
+          <div className="table-scroll"><table className="t">
             <thead><tr><th>Name</th><th className="r">Fee rate (%)</th><th>Contact</th><th>Notes</th></tr></thead>
             <tbody>
               {data.sponsors.map((sp) => <SponsorRow key={sp.slug} sp={sp} onSave={saveSponsor} />)}
             </tbody>
-          </table>
+          </table></div>
           <p className="small muted">Presets for Fractured Atlas (8%) and Producer Hub (2%). Rates change; check your agreement.</p>
         </section>
 

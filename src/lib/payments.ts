@@ -1,6 +1,6 @@
 import { parseFrontmatter, stringifyFrontmatter } from "./files";
 import type { LedgerEntry, Payment } from "./types";
-import { addDays, formatAlloc, parseAlloc, round2, uid } from "./util";
+import { addDays, formatAlloc, parseAlloc, round2, safeCurrency, uid } from "./util";
 
 interface PaymentsFile {
   payments?: (Omit<Payment, "project_alloc"> & { project_alloc: string })[];
@@ -79,7 +79,7 @@ export function paymentsToICS(payments: Payment[], currency = "USD"): string {
     if (!p.due || p.status === "paid") continue;
     const d = p.due.replace(/-/g, "");
     const end = addDays(p.due, 1).replace(/-/g, "");
-    const amt = new Intl.NumberFormat("en-US", { style: "currency", currency }).format(p.amount);
+    const amt = new Intl.NumberFormat("en-US", { style: "currency", currency: safeCurrency(currency) }).format(p.amount);
     lines.push(
       "BEGIN:VEVENT",
       `UID:${p.id}@manyproduce`,

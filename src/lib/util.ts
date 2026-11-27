@@ -74,11 +74,23 @@ export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+/** A currency code Intl accepts; anything else (a typo in settings.json) falls back to USD. */
+export function safeCurrency(currency: string | undefined): string {
+  const c = String(currency ?? "").trim().toUpperCase();
+  try {
+    new Intl.NumberFormat("en-US", { style: "currency", currency: c });
+    return c;
+  } catch {
+    return "USD";
+  }
+}
+
 export function fmtMoney(n: number, currency = "USD", opts: { sign?: boolean; cents?: boolean } = {}): string {
+  if (!Number.isFinite(n)) n = 0;
   const cents = opts.cents ?? Math.abs(n % 1) > 0.001;
   const s = new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency,
+    currency: safeCurrency(currency),
     minimumFractionDigits: cents ? 2 : 0,
     maximumFractionDigits: cents ? 2 : 0,
   }).format(Math.abs(n));

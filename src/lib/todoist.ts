@@ -141,6 +141,10 @@ export async function runSync(api: TodoistApi, wanted: WantedTask[], projectName
     const proj = found ?? ((await api.request("POST", "/api/v1/projects", { name, ...(settings.parent_project_id ? { parent_id: settings.parent_project_id } : {}) })) as { id: string });
     state.projects[slug] = proj.id;
     for (const k of Object.keys(state.sections)) if (k.startsWith(`${slug}|`)) delete state.sections[k];
+    // The project we'd made is gone (deleted in Todoist, or never existed): its
+    // tasks went with it. Forget them so they're re-created below, rather than
+    // treated as "finished in Todoist" (which would mark every item done here).
+    for (const [k, t] of Object.entries(state.tasks)) if (t.project === slug) delete state.tasks[k];
   }
   for (const slug of slugs) {
     const pid = state.projects[slug];
@@ -158,9 +162,15 @@ export async function runSync(api: TodoistApi, wanted: WantedTask[], projectName
   // 2. Completed in Todoist: a task we made that's no longer in its project's active list.
   const completedInTodoist: string[] = [];
   const trackedProjects = [...new Set(Object.values(state.tasks).map((t) => t.project))];
+  const liveIds = new Set(existing.map((p) => p.id));
   for (const slug of trackedProjects) {
     const pid = state.projects[slug];
-    if (!pid) continue;
+    // A project that's no longer in Todoist (and no longer wanted) took its tasks
+    // with it: drop them quietly instead of reporting them finished.
+    if (!pid || !liveIds.has(pid)) {
+      for (const [k, t] of Object.entries(state.tasks)) if (t.project === slug && !wanted.some((w) => w.project === slug)) delete state.tasks[k];
+      continue;
+    }
     const active = new Set((await listAll<{ id: string }>(api, `/api/v1/tasks?project_id=${pid}`)).map((t) => t.id));
     for (const [key, t] of Object.entries(state.tasks)) {
       if (t.project === slug && !active.has(t.id)) {

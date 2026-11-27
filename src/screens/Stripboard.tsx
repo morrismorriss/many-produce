@@ -188,7 +188,7 @@ function BreakdownList({ strips, onOpen }: { strips: StripScene[]; onOpen: (s: S
         <button className="btn small" onClick={() => printHtml(`${p.name} breakdown`, `<h1>${esc(p.name)}: breakdown sheets</h1>${sheetsHtml}`)}>Print breakdown sheets</button>
         <button className="btn small" onClick={() => saveTextFile(`${project}-breakdown.csv`, stripsToCSV(strips), "text/csv")}>Breakdown CSV</button>
       </div>
-      <table className="t">
+      <div className="table-scroll"><table className="t">
         <thead><tr><th>Sc</th><th>Heading</th><th className="r">Pages</th><th>Cast</th><th>Elements</th></tr></thead>
         <tbody>
           {strips.map((s) => (
@@ -201,7 +201,7 @@ function BreakdownList({ strips, onOpen }: { strips: StripScene[]; onOpen: (s: S
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </>
   );
 }

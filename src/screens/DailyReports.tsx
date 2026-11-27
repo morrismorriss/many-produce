@@ -35,7 +35,7 @@ export function DailyReports() {
         </div>
       )}
       {dates.length ? (
-        <table className="t">
+        <div className="table-scroll"><table className="t">
           <thead><tr><th>Day</th><th>Kind</th><th>Wrap</th><th className="r">People</th><th /></tr></thead>
           <tbody>
             {dates.map((d) => {
@@ -53,7 +53,7 @@ export function DailyReports() {
               );
             })}
           </tbody>
-        </table>
+        </table></div>
       ) : (
         <Empty title="No work days yet"><p>Rehearsals, tech and shoot days on the Schedule each get a daily report. It starts filled in from the Schedule.</p></Empty>
       )}
@@ -128,7 +128,7 @@ function DailyModal({ report, onClose }: { report: DailyReport; onClose: () => v
             </select>
           )}
         </div>
-        <table className="t daily-calls">
+        <div className="table-scroll"><table className="t daily-calls">
           <thead><tr><th>Person</th><th>Call</th><th>In</th><th>Out</th><th>Late</th><th>Absent</th><th className="r">Hours</th></tr></thead>
           <tbody>
             {r.calls.map((x, i) => (
@@ -143,7 +143,7 @@ function DailyModal({ report, onClose }: { report: DailyReport; onClose: () => v
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         {r.calls.some((x) => !x.out) && r.wrap && <button className="btn small ghost" onClick={() => set("calls", r.calls.map((x) => ({ ...x, out: x.out || r.wrap })))}>Set everyone&apos;s out time to wrap ({r.wrap})</button>}
       </div>
 
@@ -155,7 +155,7 @@ function DailyModal({ report, onClose }: { report: DailyReport; onClose: () => v
           </select>
         </div>
         {r.scenes.length > 0 && (
-          <table className="t">
+          <div className="table-scroll"><table className="t">
             <thead><tr><th>Scene</th><th>Status</th><th className="r">Planned (1/8 pages)</th><th className="r">Done (1/8 pages)</th></tr></thead>
             <tbody>
               {r.scenes.map((s, i) => (
@@ -167,7 +167,7 @@ function DailyModal({ report, onClose }: { report: DailyReport; onClose: () => v
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 

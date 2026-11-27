@@ -36,7 +36,7 @@ export function HouseReports() {
   return (
     <>
       {dates.length ? (
-        <table className="t">
+        <div className="table-scroll"><table className="t">
           <thead><tr><th>Performance</th><th>Venue</th><th className="r">Attendance</th><th className="r">Gross</th><th className="r">Net</th><th /></tr></thead>
           <tbody>
             {dates.map((d) => {
@@ -56,7 +56,7 @@ export function HouseReports() {
               );
             })}
           </tbody>
-        </table>
+        </table></div>
       ) : (
         <Empty title="No performances yet"><p>Add performances on the Schedule. Each one gets a quick house report after the show.</p></Empty>
       )}
@@ -87,10 +87,10 @@ export function HouseReports() {
             </ResponsiveContainer>
           </div>
           {run.byType.length > 0 && (
-            <table className="t" style={{ marginTop: 8 }}>
+            <div className="table-scroll"><table className="t" style={{ marginTop: 8 }}>
               <thead><tr><th>Ticket type</th><th className="r">Sold</th><th className="r">Revenue</th></tr></thead>
               <tbody>{run.byType.map((t) => <tr key={t.type}><td>{t.type}</td><td className="r num">{t.sold}</td><td className="r num">{money(t.revenue)}</td></tr>)}</tbody>
-            </table>
+            </table></div>
           )}
           <p className="small muted" style={{ marginTop: 6 }}>Attendance here also appears in sponsor and funder reports for the same dates.</p>
         </section>
@@ -123,7 +123,7 @@ function HouseModal({ report, onClose }: { report: HouseReport; onClose: () => v
       </div>
       <div>
         <div className="section-title"><h3>Tickets sold</h3><button className="btn small" onClick={() => setImporting(true)}>Import from ticketing CSV</button></div>
-        <table className="t">
+        <div className="table-scroll"><table className="t">
           <thead><tr><th>Type</th><th className="r">Sold</th><th className="r">Price</th><th className="r">Total</th><th /></tr></thead>
           <tbody>
             {h.tickets.map((t, i) => (
@@ -136,7 +136,7 @@ function HouseModal({ report, onClose }: { report: HouseReport; onClose: () => v
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         <datalist id="mp-ticket-types">{["Full", "Student", "Senior", "Pay what you can", "Industry", "Group"].map((x) => <option key={x} value={x} />)}</datalist>
         <button className="btn small ghost" onClick={() => set("tickets", [...h.tickets, { type: "", sold: 0, price: 0 }])}>+ Ticket type</button>
       </div>
@@ -273,7 +273,7 @@ export function VenueSettlement() {
         ) : (
           <p className="note small">No house reports at {v.name} for this project yet. Fill them in on House reports first.</p>
         )}
-        <table className="t">
+        <div className="table-scroll"><table className="t">
           <tbody>
             <tr><td>Box office (gross)</td><td className="r num">{money(s.gross, { cents: true })}</td></tr>
             {s.bar > 0 && <tr><td>Bar sales</td><td className="r num">{money(s.bar, { cents: true })}</td></tr>}
@@ -283,7 +283,7 @@ export function VenueSettlement() {
             {s.boxOfficeHeldByVenue > 0 && <tr><td className="muted">Box office held by the venue</td><td className="r num">−{money(s.boxOfficeHeldByVenue, { cents: true })}</td></tr>}
           </tbody>
           <tfoot><tr><td>{s.balance >= 0 ? "You owe the venue" : "The venue owes you"}</td><td className="r num">{money(Math.abs(s.balance), { cents: true })}</td></tr></tfoot>
-        </table>
+        </table></div>
         <p className="small muted" style={{ marginTop: 8 }}>Confirm adds a payment to the venue (if you owe them) or expected income in the budget (if they owe you).</p>
       </section>
 

@@ -165,7 +165,7 @@ export function Dashboard() {
               <summary className="muted">
                 Unscheduled budget: {money(f.unscheduled.reduce((s, u) => s + u.amount, 0))} across {f.unscheduled.length} lines (not in the chart until scheduled)
               </summary>
-              <table className="t" style={{ marginTop: 8 }}>
+              <div className="table-scroll"><table className="t" style={{ marginTop: 8 }}>
                 <tbody>
                   {f.unscheduled.map((u) => (
                     <tr key={u.project + u.line.id}>
@@ -181,7 +181,7 @@ export function Dashboard() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </details>
           )}
         </section>

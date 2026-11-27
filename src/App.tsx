@@ -18,7 +18,7 @@ import { useApp, useStore } from "./store";
 import { Drawer } from "./components/Drawer";
 import { CommandPalette, Sidebar, Toasts, sectionOf } from "./components/Shell";
 import { SupportPrompt } from "./components/Support";
-import { isTauri, MemoryFS, openDesktopVault, type VaultFS } from "./lib/fs";
+import { isTauri, MemoryFS, openDesktopVault, pickVaultFolder, type VaultFS } from "./lib/fs";
 import { sampleVault } from "./lib/seed";
 import { loadVault } from "./lib/vault";
 import { BUILTIN_THEMES, themeVars } from "./lib/themes";
@@ -70,17 +70,21 @@ export default function App() {
 
 function Welcome({ onOpen, error }: { onOpen: (fs: VaultFS) => void; error: string }) {
   const desktop = isTauri();
+  const [pickError, setPickError] = useState("");
   const pickFolder = async (withSample: boolean) => {
-    const { open } = await import("@tauri-apps/plugin-dialog");
-    const dir = await open({ directory: true, title: withSample ? "Choose an empty folder for the sample vault" : "Choose or create your Many Produce folder" });
-    if (typeof dir !== "string") return;
-    const fs = await openDesktopVault(dir);
-    if (withSample) {
-      const existing = await fs.list("");
-      if (existing.length && !confirm("That folder isn't empty. Add sample files to it anyway?")) return;
-      for (const [path, text] of Object.entries(sampleVault())) await fs.write(path, text);
+    try {
+      const dir = await pickVaultFolder(withSample ? "Choose an empty folder for the sample vault" : "Choose or create your Many Produce folder");
+      if (!dir) return;
+      const fs = await openDesktopVault(dir);
+      if (withSample) {
+        const existing = await fs.list("");
+        if (existing.length && !confirm("That folder isn't empty. Add sample files to it anyway?")) { fs.close?.(); return; }
+        for (const [path, text] of Object.entries(sampleVault())) await fs.write(path, text);
+      }
+      onOpen(fs);
+    } catch (e) {
+      setPickError(String(e));
     }
-    onOpen(fs);
   };
   const browser = (withSample: boolean) => {
     const fs = new MemoryFS(withSample ? sampleVault() : {}, true);
@@ -106,7 +110,7 @@ function Welcome({ onOpen, error }: { onOpen: (fs: VaultFS) => void; error: stri
           <p className="small muted">You&apos;re in the browser demo. Data stays in this browser only. The desktop app saves to a real folder.</p>
         </>
       )}
-      {error && <p className="neg">{error}</p>}
+      {(pickError || error) && <p className="neg">{pickError || error}</p>}
     </div>
   );
 }
@@ -164,6 +168,12 @@ function Frame({ onSwitchVault }: { onSwitchVault: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
+      // Escape closes the details drawer, unless a dialog is open or you're typing.
+      if (!mod && e.key === "Escape" && drawer && !document.querySelector(".overlay")) {
+        const t = e.target as HTMLElement | null;
+        if (!t?.closest("input, textarea, select, [contenteditable='true']")) openDrawer(null);
+        return;
+      }
       if (!mod) return;
       const k = e.key.toLowerCase();
       if (k === "k" || k === "f") { e.preventDefault(); setPalette(true); }

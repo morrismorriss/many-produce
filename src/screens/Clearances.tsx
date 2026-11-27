@@ -54,7 +54,7 @@ export function ClearancesTab() {
 
       {view === "List" ? (
         list.length ? (
-          <table className="t">
+          <div className="table-scroll"><table className="t">
             <thead><tr><th>Item</th><th>Type</th><th>Scenes</th><th>Rights holder</th><th>Scope</th><th className="r">Fee</th><th>Status</th></tr></thead>
             <tbody>
               {list.map((c) => (
@@ -69,7 +69,7 @@ export function ClearancesTab() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         ) : (
           <Empty title={items.length ? "Nothing matches" : "No clearances yet"}>
             <p>Music, footage, artwork and logos, locations, and anyone on camera. Breakdown elements on the Stripboard can be sent here with one click.</p>

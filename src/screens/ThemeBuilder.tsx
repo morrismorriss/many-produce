@@ -143,13 +143,13 @@ function Preview({ t, vars }: { t: Theme; vars: React.CSSProperties }) {
               <li><span className="pill blue">Scheduled</span><span className="muted">Venue deposit · due Jan 5</span></li>
             </ul>
           </div>
-          <table className="t">
+          <div className="table-scroll"><table className="t">
             <thead><tr><th>Date</th><th>Description</th><th>Project</th><th className="r">Amount</th></tr></thead>
             <tbody>
               <tr><td className="muted">Nov 21</td><td>Venue deposit</td><td><span className="tag"><span className="dot" style={{ background: t.tags[0] }} />Prodigy</span></td><td className="r num">−$300.00</td></tr>
               <tr><td className="muted">Nov 14</td><td>Reading sponsor gift</td><td><span className="tag"><span className="dot" style={{ background: t.tags[1] }} />Made Men</span></td><td className="r num in">+$400.00</td></tr>
             </tbody>
-          </table>
+          </table></div>
           <div className="chips"><button className="chip" aria-pressed="true">All entries</button><button className="chip">Income</button><button className="chip">Expenses</button><a href="#preview" onClick={(e) => e.preventDefault()}>A link</a></div>
         </div>
       </div>

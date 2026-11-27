@@ -94,7 +94,7 @@ function DocumentsTab({ onOpen }: { onOpen: (path: string) => void }) {
         </select>
       </div>
       {list.length ? (
-        <table className="t">
+        <div className="table-scroll"><table className="t">
           <thead><tr><th>Document</th><th>Type</th><th>Project</th><th>Parties</th><th>Status</th><th>Key date</th><th className="r">Files</th></tr></thead>
           <tbody>
             {list.map((d) => (
@@ -109,7 +109,7 @@ function DocumentsTab({ onOpen }: { onOpen: (path: string) => void }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       ) : (
         <Empty title="No documents here yet"><p>Contracts, releases, insurance certificates and permits, with what&apos;s missing up front.</p></Empty>
       )}
@@ -202,7 +202,7 @@ function W9Tab() {
       <p className="note info" style={{ marginBottom: 10 }}>
         W-9s contain taxpayer ID numbers. Many Produce only records whether a form is on file and when it arrived. It never reads or shows the numbers. Keep the forms themselves somewhere safe (an encrypted folder or disk image), and if your vault syncs through iCloud or Dropbox, remember that anything in it syncs too.
       </p>
-      <table className="t">
+      <div className="table-scroll"><table className="t">
         <thead><tr><th>Person</th><th className="r">Paid to date</th><th>W-9</th><th>Received</th><th /></tr></thead>
         <tbody>
           {paid.length > 0 && <tr className="group-head"><td colSpan={5}>Paid · {paid.length}</td></tr>}
@@ -210,7 +210,7 @@ function W9Tab() {
           {others.length > 0 && <tr className="group-head"><td colSpan={5}>Not paid yet · {others.length}</td></tr>}
           {others.map((p) => row(p, false))}
         </tbody>
-      </table>
+      </table></div>
     </section>
   );
 }
@@ -248,7 +248,7 @@ function Tab1099() {
           <YearEndButton year={year} />
         </div>
         {rows.length ? (
-          <table className="t">
+          <div className="table-scroll"><table className="t">
             <thead><tr><th>Payee</th><th className="r">Total paid</th><th>W-9 on file</th><th>1099 needed</th><th>1099 issued</th></tr></thead>
             <tbody>
               {rows.map((r) => (
@@ -261,7 +261,7 @@ function Tab1099() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         ) : (
           <p className="muted">No payments to people or businesses in {year}.</p>
         )}
@@ -286,7 +286,7 @@ function TaxDocsTab({ onAdd }: { onAdd: () => void }) {
       </div>
       <p className="small muted">1099s you received, sponsor and grant letters, and anything else your accountant will want. Saved by year in <code>paperwork/tax/</code>.</p>
       {list.length ? (
-        <table className="t">
+        <div className="table-scroll"><table className="t">
           <tbody>
             {list.map((d) => (
               <tr key={d.path} className="clickable" onClick={() => openDrawer({ kind: "doc", path: d.path })}>
@@ -294,7 +294,7 @@ function TaxDocsTab({ onAdd }: { onAdd: () => void }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       ) : (
         <p className="muted">Nothing yet.</p>
       )}

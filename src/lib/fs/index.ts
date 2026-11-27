@@ -14,7 +14,11 @@ export interface VaultFS {
   write(path: string, contents: string): Promise<void>;
   list(dir: string): Promise<DirEntry[]>;
   trash(path: string): Promise<string>;
-  importFile?(source: string, dest: string): Promise<void>;
+  /**
+   * Let the user pick a file in a native dialog and copy it into the vault as
+   * `<dir>/<base>.<ext>` (never overwriting). Returns the vault path, or null if cancelled.
+   */
+  importPick?(dir: string, base: string, title: string, extensions?: string[]): Promise<string | null>;
   /** Read any file (binary too) as base64. */
   readBase64?(path: string): Promise<string | null>;
   /** Open a vault file in the user's default app. */
@@ -25,6 +29,12 @@ export interface VaultFS {
 }
 
 export const isTauri = (): boolean => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+/** Show the native folder picker (from the Rust side, which remembers the choice as an allowed vault). */
+export async function pickVaultFolder(title: string): Promise<string | null> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string | null>("vault_pick", { title });
+}
 
 export async function openDesktopVault(root: string): Promise<VaultFS> {
   const { invoke } = await import("@tauri-apps/api/core");
@@ -48,7 +58,11 @@ export async function openDesktopVault(root: string): Promise<VaultFS> {
     write: (path, contents) => { mark(path); return invoke<void>("vault_write", { path, contents }); },
     list: (path) => invoke<DirEntry[]>("vault_list", { path }),
     trash: (path) => { mark(path); return invoke<string>("vault_trash", { path }); },
-    importFile: (source, dest) => { mark(dest); return invoke<void>("vault_import_file", { source, dest }); },
+    importPick: async (dir, base, title, extensions) => {
+      const rel = await invoke<string | null>("vault_import_pick", { dir, base, title, extensions: extensions ?? null });
+      if (rel) mark(rel);
+      return rel;
+    },
     readBase64: (path) => invoke<string | null>("vault_read_base64", { path }),
     openFile: (path) => invoke<void>("vault_open_file", { path }),
     watch: async (onChange) => {

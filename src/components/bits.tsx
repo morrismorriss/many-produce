@@ -164,10 +164,9 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
 /** Save a text file: desktop uses a save dialog; browser downloads. */
 export async function saveTextFile(name: string, text: string, mime = "text/plain") {
   if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-    const { save } = await import("@tauri-apps/plugin-dialog");
+    // The save dialog is shown by the Rust side, so the web view never picks a path.
     const { invoke } = await import("@tauri-apps/api/core");
-    const path = await save({ defaultPath: name });
-    if (path) await invoke("export_file", { path, contents: text });
+    await invoke<boolean>("export_file", { name, contents: text });
     return;
   }
   const blob = new Blob([text], { type: mime });
@@ -182,13 +181,10 @@ export async function saveTextFile(name: string, text: string, mime = "text/plai
 /** Save binary data (zip, PDF): desktop uses a save dialog; browser downloads. */
 export async function saveBinaryFile(name: string, bytes: Uint8Array) {
   if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-    const { save } = await import("@tauri-apps/plugin-dialog");
     const { invoke } = await import("@tauri-apps/api/core");
-    const path = await save({ defaultPath: name });
-    if (!path) return;
     let bin = "";
     for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    await invoke("export_file_base64", { path, data: btoa(bin) });
+    await invoke<boolean>("export_file_base64", { name, data: btoa(bin) });
     return;
   }
   const blob = new Blob([bytes as BlobPart]);

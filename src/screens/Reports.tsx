@@ -143,7 +143,7 @@ function FunderReport() {
         {sent.length > 0 && (
           <section className="card" style={{ marginTop: 14 }}>
             <div className="card-head"><h2>Sent reports</h2><span className="muted small">Numbers as they were when saved</span></div>
-            <table className="t">
+            <div className="table-scroll"><table className="t">
               <tbody>
                 {sent.map((x) => {
                   const snap = (x.snapshot ?? {}) as Record<string, number | string>;
@@ -160,7 +160,7 @@ function FunderReport() {
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
           </section>
         )}
       </div>

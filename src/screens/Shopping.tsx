@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { safeExternalUrl } from "../components/Support";
 import { CsvImportModal } from "../components/CsvImport";
 import { Chips, EditCell, Empty, Field, Modal, Plus, ProjectTag, Tile, printHtml, saveTextFile } from "../components/bits";
 import { Header } from "../components/Shell";
@@ -98,7 +99,7 @@ export function Shopping() {
                       <EditCell label="Item" value={i.item} onSave={(v) => void saveShoppingItem({ ...i, item: v })} />
                       <div className="where">
                         <EditCell label="Where to get it" placeholder="Where to get it" value={i.where} onSave={(v) => void saveShoppingItem({ ...i, where: v })} />
-                        {i.link && <a className="small" href={i.link} target="_blank" rel="noreferrer">link</a>}
+                        {safeExternalUrl(i.link) && <a className="small" href={safeExternalUrl(i.link)!} target="_blank" rel="noreferrer">link</a>}
                       </div>
                     </td>
                     <td>

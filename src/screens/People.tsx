@@ -26,7 +26,7 @@ export function Collaborators() {
       <div className="content">
         <div className="toolbar"><Chips label="Role" options={roles} value={role} onChange={setRole} /></div>
         {list.length ? (
-          <table className="t">
+          <div className="table-scroll"><table className="t">
             <thead><tr><th>Name</th><th>Does</th><th>Projects</th><th>Rate</th><th>Status</th></tr></thead>
             <tbody>
               {list.map((p) => (
@@ -39,7 +39,7 @@ export function Collaborators() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         ) : (
           <Empty title="No collaborators here yet"><p>Add the people you work with. They&apos;re shared across projects.</p></Empty>
         )}

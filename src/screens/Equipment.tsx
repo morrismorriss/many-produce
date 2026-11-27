@@ -97,7 +97,7 @@ function ByItem({ items, onEdit, onCheckOut }: { items: InventoryItem[]; onEdit:
   const { data, today, money, checkIn } = useApp();
   if (!items.length) return <Empty title="Nothing in the log yet"><p>Add gear, props, costumes, keys and anything borrowed or rented. Things bought from the Shopping list can move here with one click.</p></Empty>;
   return (
-    <table className="t">
+    <div className="table-scroll"><table className="t">
       <thead><tr><th>Item</th><th>Category</th><th>Owner</th><th>Project</th><th className="r">Value</th><th>Who has it</th><th /></tr></thead>
       <tbody>
         {[...items].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)).map((i) => {
@@ -127,7 +127,7 @@ function ByItem({ items, onEdit, onCheckOut }: { items: InventoryItem[]; onEdit:
           );
         })}
       </tbody>
-    </table>
+    </table></div>
   );
 }
 

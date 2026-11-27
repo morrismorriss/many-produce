@@ -224,7 +224,20 @@ export async function initVault(fs: VaultFS): Promise<void> {
   }
 }
 
-export async function loadVault(fs: VaultFS): Promise<VaultData> {
+export async function loadVault(vaultFs: VaultFS): Promise<VaultData> {
+  // Remember the last file read, so a parse error can say which file is broken.
+  let lastRead = "";
+  const fs: VaultFS = Object.assign(Object.create(Object.getPrototypeOf(vaultFs)), vaultFs, {
+    read: (path: string) => { lastRead = path; return vaultFs.read(path); },
+  });
+  try {
+    return await loadVaultInner(fs);
+  } catch (e) {
+    throw new Error(lastRead ? `Couldn't read ${lastRead}: ${e instanceof Error ? e.message : String(e)}` : String(e));
+  }
+}
+
+async function loadVaultInner(fs: VaultFS): Promise<VaultData> {
   await initVault(fs);
   const projects: Project[] = [];
   const budgets: Record<string, BudgetLine[]> = {};

@@ -13,7 +13,10 @@
     "windows": [
       { "title": "Many Produce", "width": 1360, "height": 860, "minWidth": 960, "minHeight": 600 }
     ],
-    "security": { "csp": null }
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src ipc: http://ipc.localhost; frame-src 'self' about:; object-src 'none'; base-uri 'self'; form-action 'none'",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420; frame-src 'self' about:; object-src 'none'; base-uri 'self'; form-action 'none'"
+    }
   },
   "bundle": {
     "active": true,

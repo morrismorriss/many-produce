@@ -82,7 +82,7 @@ export function Budget() {
               )}
             </div>
             {exp.length ? (
-              <table className="t">
+              <div className="table-scroll"><table className="t">
                 <thead>
                   <tr>
                     <th>Line</th>
@@ -109,7 +109,7 @@ export function Budget() {
                     <td />
                   </tr>
                 </tfoot>
-              </table>
+              </table></div>
             ) : (
               <Empty title="No budget lines yet">
                 {target ? <button className="btn" onClick={() => addLine("expense")}><Plus /> Add a line</button> : <p>Pick a project to start a budget.</p>}

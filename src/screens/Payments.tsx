@@ -48,7 +48,7 @@ export function Payments() {
           <Tile label="Paid" value={money(by("Paid").reduce((s, p) => s + share(p), 0))} />
         </div>
         {list.length ? (
-          <table className="t">
+          <div className="table-scroll"><table className="t">
             <thead>
               <tr>
                 <th style={{ width: 36 }}><span className="sr-only">Paid</span></th>
@@ -84,7 +84,7 @@ export function Payments() {
                 </tbody>
               );
             })}
-          </table>
+          </table></div>
         ) : (
           <Empty title="No payments scheduled">
             <p>Schedule what you owe. Ticking one paid adds it to Bookkeeping with the project and category filled in.</p>

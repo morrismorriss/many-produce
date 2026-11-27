@@ -360,7 +360,7 @@ function ReceiptPicker({ value, date, description, onChange }: { value: string; 
 
 /** Bring in a bank or card statement, a spreadsheet, or another app's export. */
 function ImportLedger({ onClose }: { onClose: () => void }) {
-  const { data, project, saveEntry, deleteEntry, toast } = useApp();
+  const { data, project, importEntries, toast } = useApp();
   const [text, setText] = useState("");
   const rows = useMemo(() => (text.trim() ? parseCSV(text) : []), [text]);
   const cols = rows.length ? Object.keys(rows[0]) : [];
@@ -368,10 +368,10 @@ function ImportLedger({ onClose }: { onClose: () => void }) {
   const m = map ?? guessMapping(cols);
   const [proj, setProj] = useState(project || data.projects.find((p) => !p.builtin)?.slug || "overhead");
   const [source, setSource] = useState(data.settings.money_sources[0]?.name ?? "Checking");
-  const result = rows.length && m.date && (m.amount || m.moneyIn || m.moneyOut) ? ledgerFromRows(rows, m, proj, source, data.ledger) : null;
+  const result = rows.length && m.date && (m.amount || m.moneyIn || m.moneyOut) ? ledgerFromRows(rows, m, proj, source, data.ledger, data.projects) : null;
   const sel = (label: string, key: keyof LedgerMapping, optional = true) => (
     <Field label={label}>
-      <select value={m[key]} onChange={(e) => setMap({ ...m, [key]: e.target.value })}>
+      <select value={m[key] ?? ""} onChange={(e) => setMap({ ...m, [key]: e.target.value })}>
         <option value="">{optional ? "—" : "Choose…"}</option>
         {cols.map((c) => <option key={c}>{c}</option>)}
       </select>
@@ -379,14 +379,13 @@ function ImportLedger({ onClose }: { onClose: () => void }) {
   );
   const run = async () => {
     if (!result) return;
-    for (const e of result.entries) await saveEntry(e);
-    const ids = result.entries.map((e) => e.id);
-    toast(`Imported ${ids.length} entries${result.skipped ? `, skipped ${result.skipped} already in the ledger` : ""}`, () => { for (const id of ids) void deleteEntry(id); });
+    const undo = await importEntries(result.entries);
+    toast(`Imported ${result.entries.length} entries${result.skipped ? `, skipped ${result.skipped} already in the ledger` : ""}`, () => void undo());
     onClose();
   };
   return (
     <Modal title="Import a statement or spreadsheet" onClose={onClose}>
-      <p className="muted small">Export a CSV from your bank, card, PayPal, Venmo or a spreadsheet. Match the columns, pick the project and where the money sat, then check the preview. Entries already in the ledger (same date, amount and description) are skipped, and you can undo the import right after.</p>
+      <p className="muted small">Export a CSV from your bank, card, PayPal, Venmo or a spreadsheet. Match the columns, pick the project and where the money sat, then check the preview. A spreadsheet with its own type, payee, project, tags or notes columns works too. Entries already in the ledger (same date, amount and description) are skipped, and you can undo the import right after.</p>
       <input type="file" accept=".csv,text/csv" aria-label="Choose a CSV file" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setText(await f.text()); setMap(null); } }} />
       <textarea className="input" style={{ minHeight: 70, fontFamily: "ui-monospace, monospace", fontSize: 12 }} aria-label="CSV text" value={text} onChange={(e) => { setText(e.target.value); setMap(null); }} />
       {cols.length > 0 && (
@@ -402,8 +401,14 @@ function ImportLedger({ onClose }: { onClose: () => void }) {
             </Field>
           )}
           {sel("Category (optional)", "category")}
-          <Field label="Project"><select value={proj} onChange={(e) => setProj(e.target.value)}>{data.projects.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}</select></Field>
-          <Field label="Money source"><select value={source} onChange={(e) => setSource(e.target.value)}>{data.settings.money_sources.map((s) => <option key={s.name}>{s.name}</option>)}</select></Field>
+          {sel("Income / expense column (optional)", "kind")}
+          {sel("Paid to / received from (optional)", "counterparty")}
+          {sel("Money source column (optional)", "source")}
+          {sel("Project column (optional)", "project")}
+          {sel("Tags (optional)", "tags")}
+          {sel("Notes (optional)", "notes")}
+          <Field label={m.project ? "Project for rows without one" : "Project"}><select value={proj} onChange={(e) => setProj(e.target.value)}>{data.projects.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}</select></Field>
+          <Field label={m.source ? "Money source for rows without one" : "Money source"}><select value={source} onChange={(e) => setSource(e.target.value)}>{data.settings.money_sources.map((s) => <option key={s.name}>{s.name}</option>)}</select></Field>
         </div>
       )}
       {result && (

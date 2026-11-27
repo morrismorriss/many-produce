@@ -17,6 +17,7 @@ import { Settings } from "./screens/Settings";
 import { useApp, useStore } from "./store";
 import { Drawer } from "./components/Drawer";
 import { CommandPalette, Sidebar, Toasts, sectionOf } from "./components/Shell";
+import { SupportPrompt } from "./components/Support";
 import { isTauri, MemoryFS, openDesktopVault, type VaultFS } from "./lib/fs";
 import { sampleVault } from "./lib/seed";
 import { loadVault } from "./lib/vault";
@@ -198,6 +199,7 @@ function Frame({ onSwitchVault }: { onSwitchVault: () => void }) {
       <main className="main">{body}</main>
       <Drawer />
       <Toasts />
+      <SupportPrompt />
       {palette && <CommandPalette onClose={() => setPalette(false)} />}
     </div>
   );

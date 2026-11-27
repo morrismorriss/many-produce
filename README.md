@@ -36,6 +36,12 @@ Also included: the Cmd/Ctrl+K command palette (jumps to any screen, project, per
 
 Everything in the spec's ten build phases is built.
 
+### Importing from spreadsheets
+
+Every list has an **Import CSV** button: Collaborators (including Google Contacts and Outlook exports), Venues, Ledger, Budget, Payments, Schedule, Shopping list and Equipment log. The dialog matches the file's columns to the app's fields (you can change any of them), shows a preview, and skips rows that are already there, or updates them if you tick the box. Each import can be undone right after. Paid payments can be added to Bookkeeping, matching expenses that are already there instead of doubling them. Schedule and shopping imports match names to collaborators and venues and can add new people. Every dialog can download a blank template CSV.
+
+Many Produce is free. If it helps, you can [buy me a coffee](https://buymeacoffee.com/morriss). The app has the same link in the sidebar and in Settings, and after a few launches it asks once. "Maybe later" waits two months, and "Don't ask again" stops it for good.
+
 ## Roadmap (build phases from the spec)
 
 1. ✅ Vault and file formats, projects and the project switcher, Bookkeeping ledger with + Income / + Expense and tags

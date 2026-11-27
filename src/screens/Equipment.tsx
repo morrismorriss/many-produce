@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { CsvImportModal } from "../components/CsvImport";
 import { Chips, Empty, Field, Modal, Plus, ProjectTag, Tile, printHtml } from "../components/bits";
 import { Header } from "../components/Shell";
 import { gearListText, gearWarnings, holderOf, isRental, ownerLabel, rentalOrders, signOutSheetHtml } from "../lib/inventory";
@@ -25,6 +26,7 @@ export function Equipment() {
   const [cat, setCat] = useState("");
   const [editing, setEditing] = useState<InventoryItem | null>(null);
   const [checkingOut, setCheckingOut] = useState<InventoryItem | null>(null);
+  const [importing, setImporting] = useState(false);
   useEffect(() => { if (newItemSignal) setEditing(blankItem(project)); }, [newItemSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const items = data.inventory.filter((i) => (!project || !i.project || i.project === project) && (!cat || i.category === cat));
@@ -41,6 +43,7 @@ export function Equipment() {
           <>
             <button className="btn" onClick={() => printHtml("Sign-out sheet", signOutSheetHtml(`${projName ? `${projName}: ` : ""}sign-out sheet`, items))}>Print sign-out sheet</button>
             <button className="btn" onClick={() => printText("Gear list", gearListText(`${projName ? `${projName}: ` : ""}gear list`, items, data.checkouts, data.people))}>Print gear list</button>
+            <button className="btn" onClick={() => setImporting(true)}>Import CSV</button>
             <button className="btn primary" onClick={() => setEditing(blankItem(project))}><Plus /> Item</button>
           </>
         }
@@ -76,6 +79,7 @@ export function Equipment() {
         )}
         {view === "Rentals" && <Rentals onEdit={setEditing} />}
       </div>
+      {importing && <CsvImportModal kind="inventory" title="Import equipment" onClose={() => setImporting(false)} />}
       {editing && <ItemModal item={editing} onClose={() => setEditing(null)} />}
       {checkingOut && <CheckOutModal item={checkingOut} onClose={() => setCheckingOut(null)} />}
     </>

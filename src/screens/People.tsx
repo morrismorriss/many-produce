@@ -4,6 +4,7 @@ import { uniqueSlug } from "../lib/util";
 import { useApp } from "../store";
 import { Chips, Empty, Field, Initials, Modal, Plus, ProjectTag } from "../components/bits";
 import { Header } from "../components/Shell";
+import { CsvImportModal } from "../components/CsvImport";
 
 const BASE_ROLES = ["Director", "Actor", "Stage manager", "Lighting", "Sound", "Costumes", "Fight choreo", "Photographer"];
 const STATUS_PILL: Record<string, string> = { Confirmed: "green", "Offer out": "blue", "Reached out": "", "Past collaborator": "" };
@@ -12,6 +13,7 @@ export function Collaborators() {
   const { data, project, openDrawer, newItemSignal } = useApp();
   const [role, setRole] = useState("All");
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   useEffect(() => { if (newItemSignal) setAdding(true); }, [newItemSignal]);
   const roles = ["All", ...new Set([...BASE_ROLES, ...data.people.flatMap((p) => p.roles)])];
   const list = useMemo(
@@ -20,7 +22,7 @@ export function Collaborators() {
   );
   return (
     <>
-      <Header title="Collaborators" actions={<button className="btn primary" onClick={() => setAdding(true)}><Plus /> Person</button>} />
+      <Header title="Collaborators" actions={<><button className="btn" onClick={() => setImporting(true)}>Import CSV</button><button className="btn primary" onClick={() => setAdding(true)}><Plus /> Person</button></>} />
       <div className="content">
         <div className="toolbar"><Chips label="Role" options={roles} value={role} onChange={setRole} /></div>
         {list.length ? (
@@ -43,6 +45,7 @@ export function Collaborators() {
         )}
       </div>
       {adding && <PersonModal onClose={() => setAdding(false)} />}
+      {importing && <CsvImportModal kind="people" title="Import contacts" onClose={() => setImporting(false)} />}
     </>
   );
 }
@@ -104,11 +107,12 @@ const VPILL: Record<VenueStatus, string> = { Contacted: "", Toured: "blue", Hold
 export function Venues() {
   const { data, project, openDrawer, newItemSignal } = useApp();
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   useEffect(() => { if (newItemSignal) setAdding(true); }, [newItemSignal]);
   const list = data.venues.filter((v) => !project || v.projects.includes(project));
   return (
     <>
-      <Header title="Venues" actions={<button className="btn primary" onClick={() => setAdding(true)}><Plus /> Venue</button>} />
+      <Header title="Venues" actions={<><button className="btn" onClick={() => setImporting(true)}>Import CSV</button><button className="btn primary" onClick={() => setAdding(true)}><Plus /> Venue</button></>} />
       <div className="content">
         <div className="chips" style={{ marginBottom: 14 }}>
           {VSTATUS.map((s) => <span key={s} className={`pill ${VPILL[s]}`}>{s} · {list.filter((v) => v.status === s).length}</span>)}
@@ -131,6 +135,7 @@ export function Venues() {
         )}
       </div>
       {adding && <VenueModal onClose={() => setAdding(false)} />}
+      {importing && <CsvImportModal kind="venues" title="Import venues" onClose={() => setImporting(false)} />}
     </>
   );
 }

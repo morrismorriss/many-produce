@@ -59,18 +59,38 @@ export interface LedgerMapping {
   moneyOut: string;
   category: string;
   negativeIs: "expense" | "income";
+  // Optional extra columns, for a spreadsheet or another app's export.
+  counterparty?: string;
+  notes?: string;
+  tags?: string;
+  project?: string;
+  source?: string;
+  kind?: string; // a column saying income / expense
 }
 
 export function guessMapping(columns: string[]): LedgerMapping {
   const find = (re: RegExp) => columns.find((c) => re.test(c)) ?? "";
+  const m = guess(find);
+  if (m.counterparty === m.description) m.counterparty = "";
+  if (m.kind === m.category) m.kind = "";
+  return m;
+}
+
+function guess(find: (re: RegExp) => string): LedgerMapping {
   return {
     date: find(/date|posted|when/i),
-    description: find(/desc|memo|payee|name|details|narrative/i),
+    description: find(/desc|memo|details|narrative/i) || find(/payee|name/i),
     amount: find(/^amount$|^amt$|^value$|^total$/i),
     moneyIn: find(/credit|deposit|money in|^in$/i),
     moneyOut: find(/debit|withdrawal|money out|^out$/i),
     category: find(/category/i),
     negativeIs: "expense",
+    counterparty: find(/^(payee|vendor|merchant|counterparty|paid to|from \/ to|from\/to|who)$/i),
+    notes: find(/^notes?$|^comments?$/i),
+    tags: find(/^tags?$|^labels?$/i),
+    project: find(/^project$|^production$|^show$/i),
+    source: find(/^(money source|account|source|paid from|card)$/i),
+    kind: find(/^(type|kind|income\/expense|in\/out)$/i),
   };
 }
 
@@ -97,7 +117,7 @@ function normDate(s: string): string {
  * Rows → ledger entries for one project and money source. Entries already in
  * the ledger (same date, amount and description) are skipped.
  */
-export function ledgerFromRows(rows: Record<string, string>[], m: LedgerMapping, project: string, source: string, existing: LedgerEntry[]): { entries: LedgerEntry[]; skipped: number; bad: number } {
+export function ledgerFromRows(rows: Record<string, string>[], m: LedgerMapping, project: string, source: string, existing: LedgerEntry[], projects: { slug: string; name: string }[] = []): { entries: LedgerEntry[]; skipped: number; bad: number } {
   const entries: LedgerEntry[] = [];
   let skipped = 0, bad = 0;
   const seen = new Set(existing.map((e) => `${e.date}|${e.amount.toFixed(2)}|${e.description.trim().toLowerCase()}`));
@@ -106,15 +126,21 @@ export function ledgerFromRows(rows: Record<string, string>[], m: LedgerMapping,
     let signed = m.amount ? num(r[m.amount]) : num(r[m.moneyIn]) - Math.abs(num(r[m.moneyOut]));
     if (m.amount && m.negativeIs === "income") signed = -signed;
     if (!date || !signed) { bad++; continue; }
-    const kind = signed < 0 ? "expense" : "income";
+    // A type column wins over the sign (spreadsheets often keep every amount positive).
+    const kindCell = (m.kind && r[m.kind] ? r[m.kind] : "").trim().toLowerCase();
+    const kind = /^(income|in|revenue|deposit|credit|donation)/.test(kindCell) ? "income" : /^(expense|out|cost|debit|spend|payment)/.test(kindCell) ? "expense" : signed < 0 ? "expense" : "income";
+    const cell = (col: string | undefined) => (col ? (r[col] ?? "").trim() : "");
+    const projCell = cell(m.project).toLowerCase();
+    const rowProject = (projCell && projects.find((p) => p.slug === projCell || p.name.trim().toLowerCase() === projCell)?.slug) || project;
     const amount = round2(Math.abs(signed));
     const description = (r[m.description] ?? "").trim();
     const key = `${date}|${amount.toFixed(2)}|${description.toLowerCase()}`;
     if (seen.has(key)) { skipped++; continue; }
     seen.add(key);
     entries.push({
-      id: uid("e"), date, kind, amount, description, project_alloc: parseAlloc(project), category: (m.category && r[m.category]) || "Other",
-      source, counterparty: "", tags: [], receipt: "", restricted_to: "", linked_payment: "", linked_shopping_item: "", notes: "Imported",
+      id: uid("e"), date, kind, amount, description, project_alloc: parseAlloc(rowProject), category: (m.category && r[m.category]) || "Other",
+      source: cell(m.source) || source, counterparty: cell(m.counterparty), tags: cell(m.tags).split(/\s*[;,]\s*/).filter(Boolean), receipt: "", restricted_to: "",
+      linked_payment: "", linked_shopping_item: "", notes: cell(m.notes) || "Imported",
     });
   }
   return { entries, skipped, bad };

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { CsvImportModal } from "../components/CsvImport";
 import { Chips, Empty, Field, Modal, Plus, ProjectTag, printHtml, saveTextFile } from "../components/bits";
 import { Header } from "../components/Shell";
 import { calledForScenes, callSheetText, conflictsForEvent, eventHours, eventsToICS, scheduleWarnings, weeklyText } from "../lib/schedule";
@@ -20,11 +21,12 @@ export function Schedule() {
   const tabs: Tab[] = ["Calendar", "Availability", "Scenes", "Timeline", ...(p?.type === "Film" || p?.stripboard ? (["Stripboard"] as Tab[]) : [])];
   const [tab, setTab] = useState<Tab>("Calendar");
   const [adding, setAdding] = useState<Partial<ScheduleEvent> | null>(null);
+  const [importing, setImporting] = useState(false);
   useEffect(() => { if (newItemSignal && tab === "Calendar") setAdding({}); }, [newItemSignal]); // eslint-disable-line react-hooks/exhaustive-deps
   const active = tabs.includes(tab) ? tab : "Calendar";
   return (
     <>
-      <Header title="Schedule" actions={active === "Calendar" ? <button className="btn primary" onClick={() => setAdding({})}><Plus /> Event</button> : null} />
+      <Header title="Schedule" actions={active === "Calendar" ? <><button className="btn" onClick={() => setImporting(true)}>Import CSV</button><button className="btn primary" onClick={() => setAdding({})}><Plus /> Event</button></> : null} />
       <div className="content">
         <div className="toolbar"><Chips label="Schedule view" options={tabs} value={active} onChange={setTab} /></div>
         {active === "Calendar" && <CalendarTab onAdd={setAdding} />}
@@ -34,6 +36,7 @@ export function Schedule() {
         {active === "Stripboard" && <StripboardTab />}
       </div>
       {adding && <EventModal preset={adding} onClose={() => setAdding(null)} />}
+      {importing && <CsvImportModal kind="events" title="Import a schedule" onClose={() => setImporting(false)} />}
     </>
   );
 }
